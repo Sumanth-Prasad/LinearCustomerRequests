@@ -359,6 +359,195 @@ def api_add_comment(issue_id):
         response.headers['Content-Type'] = 'application/json'
         return response, 500
 
+# Disable CSRF for API routes
+@csrf.exempt
+@app.route('/api/delete_issue/<issue_id>', methods=['POST'])
+def api_delete_issue(issue_id):
+    try:
+        app.logger.info(f"Processing delete request for issue {issue_id}")
+        
+        # First verify the issue exists
+        verify_query = """
+        query VerifyIssue($id: String!) {
+            issue(id: $id) {
+                id
+                identifier
+                title
+            }
+        }
+        """
+        
+        verify_vars = {"id": issue_id}
+        verify_result = execute_query(verify_query, verify_vars)
+        
+        # Log the verification result
+        app.logger.info(f"Issue verification for deletion: {json.dumps(verify_result)}")
+        
+        if not verify_result or 'data' not in verify_result or not verify_result['data'].get('issue'):
+            app.logger.error(f"Issue with ID {issue_id} could not be verified for deletion")
+            response = jsonify({
+                'success': False, 
+                'error': "Issue not found"
+            })
+            response.headers['Content-Type'] = 'application/json'
+            return response, 404
+        
+        # Issue exists, perform deletion via issueArchive mutation
+        mutation = """
+        mutation IssueArchive($id: String!) {
+            issueArchive(id: $id) {
+                success
+                issue {
+                    id
+                    title
+                }
+            }
+        }
+        """
+        
+        variables = {
+            "id": issue_id
+        }
+        
+        # Log the mutation
+        app.logger.info(f"Delete mutation: {mutation}")
+        app.logger.info(f"Delete variables: {json.dumps(variables)}")
+        
+        # Execute the delete query
+        result = execute_query(mutation, variables)
+        
+        # Log the full result
+        app.logger.info(f"Delete result: {json.dumps(result)}")
+        
+        if result and 'errors' in result:
+            error_messages = [error.get('message', 'Unknown error') for error in result['errors']]
+            error_message = '; '.join(error_messages)
+            app.logger.error(f"GraphQL errors when deleting: {error_message}")
+            response = jsonify({
+                'success': False, 
+                'error': error_message
+            })
+            response.headers['Content-Type'] = 'application/json'
+            return response, 400
+        
+        # Check for success
+        success = (result and 'data' in result and 
+                  'issueArchive' in result['data'] and 
+                  result['data']['issueArchive'].get('success'))
+        
+        if success:
+            response = jsonify({'success': True})
+            response.headers['Content-Type'] = 'application/json'
+            return response
+        else:
+            response = jsonify({
+                'success': False, 
+                'error': "Failed to delete issue"
+            })
+            response.headers['Content-Type'] = 'application/json'
+            return response, 400
+            
+    except Exception as e:
+        app.logger.error(f"Exception deleting issue: {str(e)}")
+        response = jsonify({
+            'success': False, 
+            'error': f"Server error: {str(e)}"
+        })
+        response.headers['Content-Type'] = 'application/json'
+        return response, 500
+
+# Disable CSRF for API routes
+@csrf.exempt
+@app.route('/api/delete_comment/<comment_id>', methods=['POST'])
+def api_delete_comment(comment_id):
+    try:
+        app.logger.info(f"Processing delete request for comment {comment_id}")
+        
+        # First verify the comment exists
+        verify_query = """
+        query VerifyComment($id: String!) {
+            comment(id: $id) {
+                id
+                body
+            }
+        }
+        """
+        
+        verify_vars = {"id": comment_id}
+        verify_result = execute_query(verify_query, verify_vars)
+        
+        # Log the verification result
+        app.logger.info(f"Comment verification for deletion: {json.dumps(verify_result)}")
+        
+        if not verify_result or 'data' not in verify_result or not verify_result['data'].get('comment'):
+            app.logger.error(f"Comment with ID {comment_id} could not be verified for deletion")
+            response = jsonify({
+                'success': False, 
+                'error': "Comment not found"
+            })
+            response.headers['Content-Type'] = 'application/json'
+            return response, 404
+        
+        # Comment exists, perform deletion via commentDelete mutation
+        mutation = """
+        mutation CommentDelete($id: String!) {
+            commentDelete(id: $id) {
+                success
+            }
+        }
+        """
+        
+        variables = {
+            "id": comment_id
+        }
+        
+        # Log the mutation
+        app.logger.info(f"Delete comment mutation: {mutation}")
+        app.logger.info(f"Delete comment variables: {json.dumps(variables)}")
+        
+        # Execute the delete query
+        result = execute_query(mutation, variables)
+        
+        # Log the full result
+        app.logger.info(f"Delete comment result: {json.dumps(result)}")
+        
+        if result and 'errors' in result:
+            error_messages = [error.get('message', 'Unknown error') for error in result['errors']]
+            error_message = '; '.join(error_messages)
+            app.logger.error(f"GraphQL errors when deleting comment: {error_message}")
+            response = jsonify({
+                'success': False, 
+                'error': error_message
+            })
+            response.headers['Content-Type'] = 'application/json'
+            return response, 400
+        
+        # Check for success
+        success = (result and 'data' in result and 
+                  'commentDelete' in result['data'] and 
+                  result['data']['commentDelete'].get('success'))
+        
+        if success:
+            response = jsonify({'success': True})
+            response.headers['Content-Type'] = 'application/json'
+            return response
+        else:
+            response = jsonify({
+                'success': False, 
+                'error': "Failed to delete comment"
+            })
+            response.headers['Content-Type'] = 'application/json'
+            return response, 400
+            
+    except Exception as e:
+        app.logger.error(f"Exception deleting comment: {str(e)}")
+        response = jsonify({
+            'success': False, 
+            'error': f"Server error: {str(e)}"
+        })
+        response.headers['Content-Type'] = 'application/json'
+        return response, 500
+
 # Linear API helper functions
 def execute_query(query, variables=None, access_token=None):
     """Execute a GraphQL query against the Linear API
@@ -394,12 +583,35 @@ def execute_query(query, variables=None, access_token=None):
     
     app.logger.info(f"Executing Linear API query with auth type: {auth_type}")
     
-    response = requests.post(LINEAR_API_URL, json=payload, headers=headers)
-    
-    if response.status_code == 200:
-        return response.json()
-    else:
-        app.logger.error(f"API Error: {response.status_code} - {response.text}")
+    try:
+        response = requests.post(LINEAR_API_URL, json=payload, headers=headers)
+        
+        if response.status_code == 200:
+            result = response.json()
+            
+            # Check for GraphQL errors
+            if 'errors' in result:
+                app.logger.error(f"GraphQL Errors: {json.dumps(result['errors'])}")
+                for error in result['errors']:
+                    app.logger.error(f"Error: {error.get('message')}, Extensions: {json.dumps(error.get('extensions', {}))}")
+                    
+            return result
+        else:
+            app.logger.error(f"API Error: Status {response.status_code}")
+            app.logger.error(f"Response text: {response.text}")
+            
+            # Try to get more details from the response
+            try:
+                error_json = response.json()
+                app.logger.error(f"Error details: {json.dumps(error_json)}")
+            except:
+                app.logger.error("Could not parse error response as JSON")
+                
+            return None
+            
+    except Exception as e:
+        app.logger.error(f"Exception in execute_query: {str(e)}")
+        app.logger.error(traceback.format_exc())
         return None
 
 def get_teams():
@@ -429,6 +641,12 @@ def get_projects(team_id=None):
             nodes {
                 id
                 name
+                description
+                icon
+                color
+                state
+                startDate
+                targetDate
                 lead {
                     id
                     name
@@ -439,6 +657,20 @@ def get_projects(team_id=None):
                         name
                     }
                 }
+                progress
+                issues {
+                    nodes {
+                        id
+                    }
+                }
+                completedIssues: issues(filter: { state: { type: { eq: "completed" } } }) {
+                    nodes {
+                        id
+                    }
+                }
+                completedAt
+                updatedAt
+                createdAt
             }
         }
     }
@@ -458,9 +690,29 @@ def get_projects(team_id=None):
                         if team['id'] == team_id:
                             # Add teamId property for compatibility with templates
                             project['teamId'] = team_id
+                            # Count issues manually from the nodes array
+                            project['issueCount'] = len(project.get('issues', {}).get('nodes', []))
+                            project['completedIssueCount'] = len(project.get('completedIssues', {}).get('nodes', []))
+                            
+                            # If project is completed, set progress to 100%
+                            if project.get('completedAt'):
+                                project['progress'] = 100
+                                project['completedIssueCount'] = project['issueCount']
+                                
                             projects.append(project)
                             break
         else:
+            # Process projects if no team_id filter
+            for project in all_projects:
+                # Count issues manually from the nodes array
+                project['issueCount'] = len(project.get('issues', {}).get('nodes', []))
+                project['completedIssueCount'] = len(project.get('completedIssues', {}).get('nodes', []))
+                
+                # If project is completed, set progress to 100%
+                if project.get('completedAt'):
+                    project['progress'] = 100
+                    project['completedIssueCount'] = project['issueCount']
+            
             projects = all_projects
             
     return projects
@@ -543,12 +795,23 @@ def get_issues(team_id, project_id=None):
                 team: { id: { eq: $teamId } }
                 project: { id: { eq: $projectId } }
             }
+            first: 100
+            includeArchived: false
         ) {
             nodes {
                 id
                 identifier
                 title
                 description
+                priority
+                priorityLabel
+                labels {
+                    nodes {
+                        id
+                        name
+                        color
+                    }
+                }
                 state {
                     id
                     name
@@ -572,8 +835,13 @@ def get_issues(team_id, project_id=None):
     
     result = execute_query(query, variables)
     if result and 'data' in result and 'issues' in result['data']:
-        return result['data']['issues']['nodes']
-    return []
+        # Add detailed logging for debugging
+        issues = result['data']['issues']['nodes']
+        app.logger.info(f"Retrieved {len(issues)} issues for team {team_id}")
+        return issues
+    else:
+        app.logger.error(f"Failed to retrieve issues. Result: {json.dumps(result) if result else 'None'}")
+        return []
 
 def get_issue_comments(issue_id):
     """Get comments for an issue"""
@@ -819,6 +1087,11 @@ def index():
     teams = get_teams()
     return render_template('index.html', teams=teams)
 
+@app.route('/form')
+def form():
+    """Route for displaying the embedded Fillout forms"""
+    return render_template('form.html')
+
 @app.route('/projects')
 def projects():
     team_id = request.args.get('team_id')
@@ -829,10 +1102,47 @@ def projects():
     projects = get_projects(team_id)
     return render_template('projects.html', team_id=team_id, projects=projects)
 
+@app.route('/project_roadmap')
+def project_roadmap():
+    team_id = request.args.get('team_id')
+    
+    if not team_id:
+        flash('Please select a team first')
+        return redirect(url_for('index'))
+    
+    projects = get_projects(team_id)
+    
+    # Get team data for display
+    team_name = None
+    teams = get_teams()
+    for team in teams:
+        if team['id'] == team_id:
+            team_name = team['name']
+            break
+            
+    # Sort projects by start date, with null dates at the end
+    def sort_key(project):
+        if project.get('startDate'):
+            return project.get('startDate')
+        return "9999-12-31"  # Place projects with no start date at the end
+            
+    sorted_projects = sorted(projects, key=sort_key)
+    
+    return render_template(
+        'project_roadmap.html',
+        team_id=team_id,
+        team_name=team_name,
+        projects=sorted_projects
+    )
+
 @app.route('/roadmap')
 def roadmap():
     team_id = request.args.get('team_id')
     project_id = request.args.get('project_id')
+    
+    # Debug authentication info
+    app.logger.info(f"Session contains: access_token={bool('access_token' in session)}, refresh_token={bool('refresh_token' in session)}, token_expiry={bool('token_expiry' in session)}")
+    app.logger.info(f"LINEAR_API_KEY is set: {bool(LINEAR_API_KEY)}")
     
     if not team_id:
         flash('Please select a team first')
@@ -840,6 +1150,18 @@ def roadmap():
     
     workflow_states = get_workflow_states(team_id)
     issues = get_issues(team_id, project_id)
+    
+    # Get project name if project_id is provided
+    project_name = None
+    if project_id:
+        projects = get_projects(team_id)
+        for project in projects:
+            if project['id'] == project_id:
+                project_name = project['name']
+                break
+    
+    # Debug: Log the number of issues returned
+    app.logger.info(f"Retrieved {len(issues)} issues for team {team_id} and project {project_id or 'None'}")
     
     # Group issues by workflow state
     issues_by_state = {}
@@ -854,7 +1176,8 @@ def roadmap():
     return render_template(
         'roadmap.html', 
         team_id=team_id, 
-        project_id=project_id, 
+        project_id=project_id,
+        project_name=project_name,
         workflow_states=workflow_states, 
         issues_by_state=issues_by_state
     )
@@ -2062,6 +2385,243 @@ def debug_test_linear_auth():
         LINEAR_REDIRECT_URI=LINEAR_REDIRECT_URI,
         encoded_redirect_uri=encoded_redirect_uri
     )
+
+@app.route('/api/diagnose')
+def api_diagnose():
+    """A diagnostic endpoint to check API connectivity"""
+    results = {}
+    
+    # Check if we have credentials
+    results['has_api_key'] = bool(LINEAR_API_KEY)
+    results['has_oauth_config'] = bool(LINEAR_CLIENT_ID and LINEAR_CLIENT_SECRET)
+    results['has_user_session'] = bool(session.get('user'))
+    
+    # Try a basic API call to check connectivity
+    viewer_query = "query { viewer { id name } }"
+    try:
+        viewer_result = execute_query(viewer_query)
+        results['api_accessible'] = bool(viewer_result and 'data' in viewer_result and 'viewer' in viewer_result['data'])
+        if results['api_accessible']:
+            results['user_name'] = viewer_result['data']['viewer'].get('name', 'Unknown')
+    except Exception as e:
+        results['api_accessible'] = False
+        results['api_error'] = str(e)
+    
+    # Try to get teams
+    try:
+        teams = get_teams()
+        results['can_fetch_teams'] = bool(teams)
+        results['team_count'] = len(teams)
+        
+        # If we have teams, try to get issues for the first team
+        if teams:
+            team_id = teams[0]['id']
+            issues = get_issues(team_id)
+            results['can_fetch_issues'] = bool(issues is not None)
+            results['issue_count'] = len(issues)
+            
+            # Sample first issue data to check structure
+            if issues and len(issues) > 0:
+                sample_issue = issues[0]
+                results['sample_issue'] = {
+                    'id': sample_issue.get('id'),
+                    'title': sample_issue.get('title'),
+                    'has_state': bool(sample_issue.get('state')),
+                    'has_assignee': bool(sample_issue.get('assignee')),
+                    'has_labels': bool(sample_issue.get('labels') and sample_issue['labels'].get('nodes'))
+                }
+    except Exception as e:
+        results['fetch_error'] = str(e)
+    
+    return jsonify(results)
+
+@app.route('/api/get_activity')
+def api_get_activity():
+    """Retrieve recent activity for issues"""
+    try:
+        project_id = request.args.get('project_id')
+        team_id = request.args.get('team_id')
+        
+        # Base query to get recent activity - updated to use correct schema
+        query = """
+        query GetActivity($teamId: ID, $projectId: ID) {
+          # Get issues sorted by most recently updated to show recent activity
+          issues(
+            first: 25,
+            orderBy: updatedAt,
+            filter: {
+              team: { id: { eq: $teamId } }
+              project: { id: { eq: $projectId } }
+            }
+          ) {
+            nodes {
+              id
+              identifier
+              title
+              createdAt
+              updatedAt
+              creator {
+                id
+                name
+                displayName
+              }
+              state {
+                id
+                name
+                color
+              }
+              history(first: 10) {
+                nodes {
+                  id
+                  createdAt
+                  fromState {
+                    id
+                    name
+                  }
+                  toState {
+                    id
+                    name
+                  }
+                  actor {
+                    id
+                    name
+                    displayName
+                  }
+                }
+              }
+            }
+          }
+          
+          # Get recent comments
+          comments(
+            first: 25,
+            orderBy: createdAt,
+            filter: {
+              issue: { 
+                team: { id: { eq: $teamId } }
+                project: { id: { eq: $projectId } }
+              }
+            }
+          ) {
+            nodes {
+              id
+              createdAt
+              body
+              user {
+                id
+                name
+                displayName
+              }
+              issue {
+                id
+                identifier
+                title
+              }
+            }
+          }
+        }
+        """
+        
+        variables = {}
+        if team_id:
+            variables["teamId"] = team_id
+        if project_id:
+            variables["projectId"] = project_id
+            
+        # Execute the GraphQL query
+        result = execute_query(query, variables)
+        
+        if not result or 'data' not in result:
+            app.logger.error(f"Failed to fetch activity data: {result}")
+            return jsonify({
+                'success': False,
+                'error': 'Failed to fetch activity data',
+                'raw_response': result
+            }), 400
+            
+        # Process the results into a unified activity feed
+        activities = []
+        
+        # Process issue creation and state changes
+        if 'issues' in result['data'] and 'nodes' in result['data']['issues']:
+            issues = result['data']['issues']['nodes']
+            
+            # Process issue creation events
+            for issue in issues:
+                # Add issue creation event
+                if issue.get('creator'):
+                    activities.append({
+                        'id': f"{issue['id']}_created",
+                        'type': 'issue_created',
+                        'createdAt': issue['createdAt'],
+                        'user': {
+                            'id': issue['creator']['id'],
+                            'name': issue['creator']['displayName'] or issue['creator']['name']
+                        },
+                        'issue': {
+                            'id': issue['id'],
+                            'identifier': issue['identifier'],
+                            'title': issue['title']
+                        }
+                    })
+                
+                # Process issue history (state changes)
+                if 'history' in issue and 'nodes' in issue['history']:
+                    for event in issue['history']['nodes']:
+                        if (isinstance(event, dict) and 
+                            event.get('fromState') and 
+                            event.get('toState') and
+                            isinstance(event['fromState'], dict) and
+                            isinstance(event['toState'], dict)):
+                            activities.append({
+                                'id': event['id'],
+                                'type': 'state_changed',
+                                'createdAt': event['createdAt'],
+                                'user': {
+                                    'id': event['actor']['id'] if event.get('actor') else None,
+                                    'name': event['actor']['displayName'] or event['actor']['name'] if event.get('actor') else 'Unknown'
+                                },
+                                'issue': {
+                                    'id': issue['id'],
+                                    'identifier': issue['identifier'],
+                                    'title': issue['title']
+                                },
+                                'fromState': event['fromState']['name'],
+                                'toState': event['toState']['name']
+                            })
+        
+        # Process comments
+        if 'comments' in result['data'] and 'nodes' in result['data']['comments']:
+            for comment in result['data']['comments']['nodes']:
+                activities.append({
+                    'id': comment['id'],
+                    'type': 'comment_created',
+                    'createdAt': comment['createdAt'],
+                    'user': {
+                        'id': comment['user']['id'] if comment.get('user') else None,
+                        'name': comment['user']['displayName'] or comment['user']['name'] if comment.get('user') else 'Anonymous'
+                    },
+                    'issue': comment['issue'],
+                    'comment': comment['body']
+                })
+        
+        # Sort all activities by creation date (newest first)
+        activities.sort(key=lambda x: x['createdAt'], reverse=True)
+        
+        # Limit to 50 most recent activities
+        activities = activities[:50]
+        
+        return jsonify({
+            'success': True,
+            'activities': activities
+        })
+        
+    except Exception as e:
+        app.logger.error(f"Error fetching activity feed: {str(e)}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': f"Failed to fetch activity: {str(e)}"
+        }), 500
 
 if __name__ == '__main__':
     # Check if API key is set

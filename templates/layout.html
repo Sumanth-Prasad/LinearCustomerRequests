@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-bs-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,81 +8,243 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Marked.js for Markdown rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/marked@4.3.0/marked.min.js"></script>
+    <!-- Highlight.js for code syntax highlighting -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/styles/github.css">
+    <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.7.0/highlight.min.js"></script>
     <!-- Custom CSS -->
     <style>
+        :root {
+            --kanban-column-bg: #f1f3f5;
+            --issue-card-bg: #ffffff;
+            --issue-id-color: #505a64;
+            --text-muted: #495057;
+            --card-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            --card-hover-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            --comment-bg: #f8f9fa;
+        }
+
+        [data-bs-theme="dark"] {
+            --kanban-column-bg: #2c3034;
+            --issue-card-bg: #343a40;
+            --issue-id-color: #adb5bd;
+            --text-muted: #9da5ae;
+            --card-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            --card-hover-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            --comment-bg: #2c3034;
+        }
+
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f8f9fa;
             padding-top: 20px;
         }
+
         .card {
             margin-bottom: 15px;
             border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            box-shadow: var(--card-shadow);
         }
+        
         .kanban-column {
             min-height: 600px;
-            background-color: #f1f3f5;
+            background-color: var(--kanban-column-bg);
             border-radius: 8px;
             padding: 10px;
         }
+        
         .kanban-column-header {
             padding: 10px;
-            border-bottom: 1px solid #dee2e6;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.125);
             font-weight: 600;
             text-align: center;
             border-radius: 8px 8px 0 0;
         }
+        
+        /* Ensure column header text is always readable by enforcing minimum contrast */
+        [data-bs-theme="light"] .kanban-column-header {
+            text-shadow: 0 0 1px rgba(0, 0, 0, 0.2);
+            font-weight: 700;
+        }
+        
+        [data-bs-theme="dark"] .kanban-column-header {
+            text-shadow: 0 0 1px rgba(0, 0, 0, 0.5);
+            font-weight: 700;
+        }
+        
         .issue-card {
-            background-color: white;
+            background-color: var(--issue-card-bg);
             border-radius: 6px;
             padding: 10px;
             margin-bottom: 10px;
             border-left: 4px solid #007bff;
             cursor: pointer;
         }
+        
         .issue-card:hover {
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            box-shadow: var(--card-hover-shadow);
         }
+        
         .issue-title {
             font-weight: 600;
             margin-bottom: 5px;
         }
+        
         .issue-id {
             font-size: 0.85rem;
-            color: #6c757d;
+            color: var(--issue-id-color);
         }
+        
         .issue-assignee {
             font-size: 0.85rem;
             margin-top: 5px;
+            color: var(--text-muted);
         }
+        
         .breadcrumb {
             background-color: transparent;
             padding: 0.5rem 1rem;
             margin-bottom: 1rem;
             border-radius: 0.25rem;
         }
+        
         .comment-container {
             margin-top: 15px;
-            border-top: 1px solid #dee2e6;
+            border-top: 1px solid rgba(0, 0, 0, 0.125);
             padding-top: 15px;
         }
+        
         .comment {
-            background-color: #f8f9fa;
+            background-color: var(--comment-bg);
             border-radius: 8px;
             padding: 12px;
             margin-bottom: 10px;
         }
+        
         .comment-author {
             font-weight: 600;
             margin-bottom: 5px;
         }
+        
         .comment-date {
             font-size: 0.8rem;
-            color: #6c757d;
+            color: var(--text-muted);
         }
+        
         .form-floating {
             margin-bottom: 15px;
+        }
+
+        /* Theme toggle button styles */
+        .theme-toggle {
+            cursor: pointer;
+            padding: 0.5rem;
+            border-radius: 50%;
+            width: 38px;
+            height: 38px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 10px;
+        }
+        
+        /* Markdown content styles */
+        .markdown-content {
+            line-height: 1.6;
+            background-color: rgba(0, 0, 0, 0.03);
+        }
+        
+        [data-bs-theme="dark"] .markdown-content {
+            background-color: rgba(255, 255, 255, 0.05);
+            color: #e9ecef;
+        }
+        
+        .markdown-content h1 {
+            font-size: 1.8rem;
+            margin-top: 1.5rem;
+            margin-bottom: 1rem;
+        }
+        
+        .markdown-content h2 {
+            font-size: 1.5rem;
+            margin-top: 1.4rem;
+            margin-bottom: 0.8rem;
+        }
+        
+        .markdown-content h3 {
+            font-size: 1.3rem;
+            margin-top: 1.3rem;
+            margin-bottom: 0.7rem;
+        }
+        
+        .markdown-content h4, .markdown-content h5, .markdown-content h6 {
+            font-size: 1.1rem;
+            margin-top: 1.2rem;
+            margin-bottom: 0.6rem;
+        }
+        
+        .markdown-content code {
+            padding: 0.2em 0.4em;
+            background-color: rgba(0, 0, 0, 0.05);
+            border-radius: 3px;
+        }
+        
+        .markdown-content pre {
+            padding: 1rem;
+            background-color: rgba(0, 0, 0, 0.05);
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+        
+        .markdown-content pre > code {
+            background-color: transparent;
+            padding: 0;
+        }
+        
+        .markdown-content blockquote {
+            border-left: 4px solid #ced4da;
+            padding-left: 1rem;
+            margin-left: 0;
+            color: #6c757d;
+        }
+        
+        .markdown-content img {
+            max-width: 100%;
+            border-radius: 5px;
+        }
+        
+        .markdown-content table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 1rem 0;
+        }
+        
+        .markdown-content table th,
+        .markdown-content table td {
+            border: 1px solid #dee2e6;
+            padding: 0.5rem;
+        }
+        
+        .markdown-content table th {
+            background-color: rgba(0, 0, 0, 0.05);
+        }
+        
+        /* Dark theme adjustments for markdown */
+        [data-bs-theme="dark"] .markdown-content code {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+        
+        [data-bs-theme="dark"] .markdown-content pre {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+        
+        [data-bs-theme="dark"] .markdown-content blockquote {
+            border-left-color: #495057;
+            color: #adb5bd;
+        }
+        
+        [data-bs-theme="dark"] .markdown-content table th {
+            background-color: rgba(255, 255, 255, 0.05);
         }
     </style>
     {% block head %}{% endblock %}
@@ -90,7 +252,7 @@
 <body>
     <div class="container">
         <header class="mb-4">
-            <nav class="navbar navbar-expand-lg navbar-light bg-light">
+            <nav class="navbar navbar-expand-lg">
                 <div class="container-fluid">
                     <a class="navbar-brand" href="{{ url_for('index') }}">Linear Issue Roadmap</a>
                     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
@@ -101,8 +263,16 @@
                             <li class="nav-item">
                                 <a class="nav-link" href="{{ url_for('index') }}">Home</a>
                             </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="{{ url_for('form') }}">Forms</a>
+                            </li>
                         </ul>
                         <ul class="navbar-nav ms-auto">
+                            <li class="nav-item d-flex align-items-center">
+                                <button class="theme-toggle btn" id="themeToggle" title="Toggle dark/light mode">
+                                    <i class="fas fa-moon"></i>
+                                </button>
+                            </li>
                             {% if session.get('user') %}
                                 <li class="nav-item dropdown">
                                     <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
@@ -149,6 +319,100 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <!-- jQuery -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <!-- Markdown Configuration -->
+    <script>
+        // Configure Marked options
+        marked.setOptions({
+            gfm: true,                   // GitHub Flavored Markdown
+            breaks: true,                // Line breaks are translated to <br>
+            headerIds: true,             // Include IDs in headers
+            mangle: false,               // Don't escape HTML
+            highlight: function(code, lang) {
+                // Use highlight.js for code syntax highlighting if available
+                if (hljs && lang && hljs.getLanguage(lang)) {
+                    try {
+                        return hljs.highlight(code, { language: lang }).value;
+                    } catch (e) {}
+                }
+                return code;
+            }
+        });
+        
+        // Helper function to detect and render Linear mentions
+        function renderLinearMentions(html) {
+            // Replace Linear URLs with mentions
+            return html.replace(
+                /https:\/\/linear\.app\/[^\/]+\/(?:issue|profiles)\/([^\/\s]+)(?:\/([^\/\s]+))?/g, 
+                function(match, id, title) {
+                    if (match.includes('/profiles/')) {
+                        return `<strong>@${id}</strong>`;
+                    } else {
+                        return `<strong>@${id}</strong>` + (title ? ` ${title.replace(/-/g, ' ')}` : '');
+                    }
+                }
+            );
+        }
+        
+        // Function to render markdown with Linear-specific extensions
+        function renderMarkdown(markdownText) {
+            if (!markdownText) return '';
+            
+            let html = marked.parse(markdownText);
+            
+            // Handle Linear-specific collapsible sections
+            html = html.replace(
+                /<p>\+\+\+\s*(.*?)<\/p>([\s\S]*?)<p>\+\+\+<\/p>/g,
+                '<details><summary>$1</summary>$2</details>'
+            );
+            
+            // Process Linear mentions
+            html = renderLinearMentions(html);
+            
+            return html;
+        }
+        
+        // Function to render all markdown content on page load
+        function processAllMarkdownContent() {
+            document.querySelectorAll('.markdown-content').forEach(function(element) {
+                const originalText = element.textContent || element.innerText;
+                element.innerHTML = renderMarkdown(originalText);
+            });
+        }
+        
+        // Run on document ready
+        document.addEventListener('DOMContentLoaded', function() {
+            processAllMarkdownContent();
+        });
+    </script>
+    <!-- Theme Toggle Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Check for saved theme preference or use default
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            setTheme(savedTheme);
+            
+            // Theme toggle button
+            const themeToggle = document.getElementById('themeToggle');
+            themeToggle.addEventListener('click', function() {
+                const currentTheme = document.documentElement.getAttribute('data-bs-theme');
+                const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+                setTheme(newTheme);
+                localStorage.setItem('theme', newTheme);
+            });
+            
+            function setTheme(theme) {
+                document.documentElement.setAttribute('data-bs-theme', theme);
+                
+                // Update toggle button icon
+                const iconElement = document.querySelector('#themeToggle i');
+                if (theme === 'dark') {
+                    iconElement.className = 'fas fa-sun';
+                } else {
+                    iconElement.className = 'fas fa-moon';
+                }
+            }
+        });
+    </script>
     {% block scripts %}{% endblock %}
 </body>
 </html> 

@@ -21,14 +21,19 @@
         <div class="card mb-4">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h3 class="card-title mb-0">{{ issue.identifier }} <span id="issue-title-display">{{ issue.title }}</span></h3>
-                <button class="btn btn-sm btn-outline-primary" id="edit-issue-btn">
-                    <i class="fas fa-edit"></i> Edit
-                </button>
+                <div>
+                    <button class="btn btn-sm btn-outline-primary me-2" id="edit-issue-btn">
+                        <i class="fas fa-edit"></i> Edit
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger" id="delete-issue-btn">
+                        <i class="fas fa-trash-alt"></i> Delete
+                    </button>
+                </div>
             </div>
             <div class="card-body">
                 <div id="issue-view-mode">
                     <p class="mb-3"><strong>Description:</strong></p>
-                    <div class="p-3 bg-light rounded" id="issue-description-display">{{ issue.description or 'No description provided.' }}</div>
+                    <div class="p-3 rounded markdown-content" id="issue-description-display">{{ issue.description or 'No description provided.' }}</div>
                 </div>
                 
                 <div id="issue-edit-mode" style="display: none;">
@@ -78,15 +83,20 @@
                     {% if issue.comments and issue.comments.nodes %}
                         {% for comment in issue.comments.nodes %}
                         <div class="comment mb-3" data-comment-id="{{ comment.id }}">
-                            <div class="comment-author">
-                                {% if comment.user %}
-                                {{ comment.user.displayName or comment.user.name }}
-                                {% else %}
-                                <span class="user-label badge bg-secondary">Added via API</span>
-                                {% endif %}
-                                <span class="comment-date">{{ comment.createdAt|format_date }}</span>
+                            <div class="comment-author d-flex justify-content-between">
+                                <div>
+                                    {% if comment.user %}
+                                    {{ comment.user.displayName or comment.user.name }}
+                                    {% else %}
+                                    <span class="user-label badge bg-secondary">Added via API</span>
+                                    {% endif %}
+                                    <span class="comment-date">{{ comment.createdAt|format_date }}</span>
+                                </div>
+                                <button class="btn btn-sm btn-outline-danger delete-comment-btn" data-comment-id="{{ comment.id }}">
+                                    <i class="fas fa-trash-alt"></i>
+                                </button>
                             </div>
-                            <div class="comment-body">{{ comment.body }}</div>
+                            <div class="comment-body markdown-content p-3 rounded">{{ comment.body }}</div>
                         </div>
                         {% endfor %}
                     {% else %}
@@ -153,6 +163,408 @@
 {% block scripts %}
 <script>
     $(document).ready(function() {
+        // Create context menus
+        const issueContextMenu = $('<div>')
+            .addClass('dropdown-menu context-menu')
+            .css({
+                position: 'absolute',
+                zIndex: 1000,
+                display: 'none'
+            })
+            .append(
+                $('<a>')
+                    .addClass('dropdown-item text-danger')
+                    .attr('href', '#')
+                    .attr('id', 'delete-issue')
+                    .html('<i class="fas fa-trash-alt me-2"></i>Delete Issue')
+            )
+            .appendTo('body');
+            
+        const commentContextMenu = $('<div>')
+            .addClass('dropdown-menu context-menu')
+            .css({
+                position: 'absolute',
+                zIndex: 1000,
+                display: 'none'
+            })
+            .append(
+                $('<a>')
+                    .addClass('dropdown-item text-danger')
+                    .attr('href', '#')
+                    .attr('id', 'delete-comment')
+                    .html('<i class="fas fa-trash-alt me-2"></i>Delete Comment')
+            )
+            .appendTo('body');
+        
+        let currentCommentElement = null;
+        let currentCommentId = null;
+        
+        // Add style for context menu if not already defined
+        if (!document.getElementById('context-menu-styles')) {
+            $('<style id="context-menu-styles">')
+                .text(`
+                    .context-menu {
+                        min-width: 180px;
+                        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+                        border: 1px solid rgba(0, 0, 0, 0.1);
+                        background-color: #fff;
+                        padding: 0.5rem 0;
+                    }
+                    
+                    .context-menu .dropdown-item {
+                        padding: 0.5rem 1rem;
+                        cursor: pointer;
+                    }
+                    
+                    .context-menu .dropdown-item:hover {
+                        background-color: #f8f9fa;
+                    }
+                    
+                    [data-bs-theme="dark"] .context-menu {
+                        background-color: #343a40;
+                        border-color: rgba(255, 255, 255, 0.1);
+                    }
+                    
+                    [data-bs-theme="dark"] .context-menu .dropdown-item {
+                        color: #fff;
+                    }
+                    
+                    [data-bs-theme="dark"] .context-menu .dropdown-item:hover {
+                        background-color: #495057;
+                    }
+                    
+                    .comment {
+                        position: relative;
+                    }
+                    
+                    .card-header {
+                        position: relative;
+                    }
+                `)
+                .appendTo('head');
+        }
+        
+        // Right-click on issue header
+        $('.card-header').on('contextmenu', function(e) {
+            // Only show menu on the main issue header
+            if ($(this).find('#issue-title-display').length === 0) {
+                return;
+            }
+            
+            e.preventDefault();
+            
+            // Hide other context menus
+            commentContextMenu.hide();
+            
+            // Position and show issue context menu
+            issueContextMenu.css({
+                top: e.pageY + 'px',
+                left: e.pageX + 'px'
+            }).show();
+            
+            // Hide menu when clicking elsewhere
+            $(document).one('click', function() {
+                issueContextMenu.hide();
+            });
+        });
+        
+        // Right-click on comment
+        $('.comment').on('contextmenu', function(e) {
+            e.preventDefault();
+            
+            // Hide other context menus
+            issueContextMenu.hide();
+            
+            // Store the current comment
+            currentCommentElement = $(this);
+            currentCommentId = $(this).data('comment-id');
+            
+            // Only show delete option if there's a comment ID
+            if (!currentCommentId) {
+                return;
+            }
+            
+            // Position and show comment context menu
+            commentContextMenu.css({
+                top: e.pageY + 'px',
+                left: e.pageX + 'px'
+            }).show();
+            
+            // Hide menu when clicking elsewhere
+            $(document).one('click', function() {
+                commentContextMenu.hide();
+            });
+        });
+        
+        // Handle delete issue action
+        $('#delete-issue').on('click', function(e) {
+            e.preventDefault();
+            
+            const issueId = '{{ issue.id }}';
+            const issueIdentifier = '{{ issue.identifier }}';
+            
+            // Show confirmation dialog
+            if (confirm(`Are you sure you want to delete issue ${issueIdentifier}? This action cannot be undone.`)) {
+                // Show loading overlay
+                const overlay = $('<div class="position-fixed top-0 start-0 w-100 h-100 bg-dark bg-opacity-50 d-flex align-items-center justify-content-center" style="z-index: 9999;">')
+                    .append('<div class="spinner-border text-light" role="status"><span class="visually-hidden">Loading...</span></div>')
+                    .appendTo('body');
+                
+                // Send delete request
+                fetch(`/api/delete_issue/${issueId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    overlay.remove();
+                    
+                    if (data.success) {
+                        // Show success message
+                        const message = $('<div class="alert alert-success position-fixed top-0 start-50 translate-middle-x p-3" style="z-index: 9999;">')
+                            .text(`Issue ${issueIdentifier} has been deleted`)
+                            .appendTo('body');
+                        
+                        setTimeout(() => {
+                            message.fadeOut(() => message.remove());
+                            // Redirect to roadmap
+                            window.location.href = "{{ url_for('roadmap', team_id=issue.team.id) }}";
+                        }, 1500);
+                    } else {
+                        // Show error message
+                        const message = $('<div class="alert alert-danger position-fixed top-0 start-50 translate-middle-x p-3" style="z-index: 9999;">')
+                            .text(`Error: ${data.error || 'Failed to delete issue'}`)
+                            .appendTo('body');
+                        
+                        setTimeout(() => {
+                            message.fadeOut(() => message.remove());
+                        }, 3000);
+                    }
+                })
+                .catch(error => {
+                    overlay.remove();
+                    
+                    // Show error message
+                    const message = $('<div class="alert alert-danger position-fixed top-0 start-50 translate-middle-x p-3" style="z-index: 9999;">')
+                        .text(`Error: ${error.message || 'Network error'}`)
+                        .appendTo('body');
+                    
+                    setTimeout(() => {
+                        message.fadeOut(() => message.remove());
+                    }, 3000);
+                });
+            }
+        });
+        
+        // Add handler for delete issue button
+        $('#delete-issue-btn').on('click', function() {
+            const issueId = '{{ issue.id }}';
+            const issueIdentifier = '{{ issue.identifier }}';
+            
+            // Show confirmation dialog
+            if (confirm(`Are you sure you want to delete issue ${issueIdentifier}? This action cannot be undone.`)) {
+                // Show loading overlay
+                const overlay = $('<div class="position-fixed top-0 start-0 w-100 h-100 bg-dark bg-opacity-50 d-flex align-items-center justify-content-center" style="z-index: 9999;">')
+                    .append('<div class="spinner-border text-light" role="status"><span class="visually-hidden">Loading...</span></div>')
+                    .appendTo('body');
+                
+                // Send delete request
+                fetch(`/api/delete_issue/${issueId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    overlay.remove();
+                    
+                    if (data.success) {
+                        // Show success message
+                        const message = $('<div class="alert alert-success position-fixed top-0 start-50 translate-middle-x p-3" style="z-index: 9999;">')
+                            .text(`Issue ${issueIdentifier} has been deleted`)
+                            .appendTo('body');
+                        
+                        setTimeout(() => {
+                            message.fadeOut(() => message.remove());
+                            // Redirect to roadmap
+                            window.location.href = "{{ url_for('roadmap', team_id=issue.team.id) }}";
+                        }, 1500);
+                    } else {
+                        // Show error message
+                        const message = $('<div class="alert alert-danger position-fixed top-0 start-50 translate-middle-x p-3" style="z-index: 9999;">')
+                            .text(`Error: ${data.error || 'Failed to delete issue'}`)
+                            .appendTo('body');
+                        
+                        setTimeout(() => {
+                            message.fadeOut(() => message.remove());
+                        }, 3000);
+                    }
+                })
+                .catch(error => {
+                    overlay.remove();
+                    
+                    // Show error message
+                    const message = $('<div class="alert alert-danger position-fixed top-0 start-50 translate-middle-x p-3" style="z-index: 9999;">')
+                        .text(`Error: ${error.message || 'Network error'}`)
+                        .appendTo('body');
+                    
+                    setTimeout(() => {
+                        message.fadeOut(() => message.remove());
+                    }, 3000);
+                });
+            }
+        });
+        
+        // Handle delete comment action
+        $('#delete-comment').on('click', function(e) {
+            e.preventDefault();
+            
+            if (!currentCommentId || !currentCommentElement) {
+                return;
+            }
+            
+            // Show confirmation dialog
+            if (confirm('Are you sure you want to delete this comment? This action cannot be undone.')) {
+                // Add loading indicator to the comment
+                const loadingOverlay = $('<div class="position-absolute top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center bg-white bg-opacity-75">')
+                    .append('<div class="spinner-border text-primary"></div>')
+                    .css('zIndex', 1000);
+                
+                currentCommentElement.css('position', 'relative').append(loadingOverlay);
+                
+                // Send delete request
+                fetch(`/api/delete_comment/${currentCommentId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Remove comment with animation
+                        currentCommentElement.fadeOut(300, function() {
+                            $(this).remove();
+                            
+                            // Add a "no comments" message if all comments are gone
+                            if ($('.comment').length === 0) {
+                                $('#comments-container').html('<p class="text-muted">No comments yet.</p>');
+                            }
+                        });
+                        
+                        // Show success notification
+                        const successMsg = $('<div class="alert alert-success position-fixed top-0 start-50 translate-middle-x p-3">')
+                            .text('Comment has been deleted')
+                            .appendTo('body');
+                        
+                        setTimeout(() => {
+                            successMsg.fadeOut(() => successMsg.remove());
+                        }, 3000);
+                    } else {
+                        // Remove loading indicator
+                        loadingOverlay.remove();
+                        
+                        const errorMsg = $('<div class="alert alert-danger position-fixed top-0 start-50 translate-middle-x p-3">')
+                            .text(`Error: ${data.error || 'Failed to delete comment'}`)
+                            .appendTo('body');
+                        
+                        setTimeout(() => {
+                            errorMsg.fadeOut(() => errorMsg.remove());
+                        }, 3000);
+                    }
+                })
+                .catch(error => {
+                    // Remove loading indicator
+                    loadingOverlay.remove();
+                    
+                    const errorMsg = $('<div class="alert alert-danger position-fixed top-0 start-50 translate-middle-x p-3">')
+                        .text(`Error: ${error.message || 'Network error'}`)
+                        .appendTo('body');
+                    
+                    setTimeout(() => {
+                        errorMsg.fadeOut(() => errorMsg.remove());
+                    }, 3000);
+                });
+            }
+        });
+        
+        // Add handler for delete comment buttons
+        $('.delete-comment-btn').on('click', function() {
+            const commentId = $(this).data('comment-id');
+            const commentElement = $(this).closest('.comment');
+            
+            if (!commentId || !commentElement) {
+                return;
+            }
+            
+            // Show confirmation dialog
+            if (confirm('Are you sure you want to delete this comment? This action cannot be undone.')) {
+                // Add loading indicator to the comment
+                const loadingOverlay = $('<div class="position-absolute top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center bg-white bg-opacity-75">')
+                    .append('<div class="spinner-border text-primary"></div>')
+                    .css('zIndex', 1000);
+                
+                commentElement.css('position', 'relative').append(loadingOverlay);
+                
+                // Send delete request
+                fetch(`/api/delete_comment/${commentId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Remove comment with animation
+                        commentElement.fadeOut(300, function() {
+                            $(this).remove();
+                            
+                            // Add a "no comments" message if all comments are gone
+                            if ($('.comment').length === 0) {
+                                $('#comments-container').html('<p class="text-muted">No comments yet.</p>');
+                            }
+                        });
+                        
+                        // Show success notification
+                        const successMsg = $('<div class="alert alert-success position-fixed top-0 start-50 translate-middle-x p-3">')
+                            .text('Comment has been deleted')
+                            .appendTo('body');
+                        
+                        setTimeout(() => {
+                            successMsg.fadeOut(() => successMsg.remove());
+                        }, 3000);
+                    } else {
+                        // Remove loading indicator
+                        loadingOverlay.remove();
+                        
+                        const errorMsg = $('<div class="alert alert-danger position-fixed top-0 start-50 translate-middle-x p-3">')
+                            .text(`Error: ${data.error || 'Failed to delete comment'}`)
+                            .appendTo('body');
+                        
+                        setTimeout(() => {
+                            errorMsg.fadeOut(() => errorMsg.remove());
+                        }, 3000);
+                    }
+                })
+                .catch(error => {
+                    // Remove loading indicator
+                    loadingOverlay.remove();
+                    
+                    const errorMsg = $('<div class="alert alert-danger position-fixed top-0 start-50 translate-middle-x p-3">')
+                        .text(`Error: ${error.message || 'Network error'}`)
+                        .appendTo('body');
+                    
+                    setTimeout(() => {
+                        errorMsg.fadeOut(() => errorMsg.remove());
+                    }, 3000);
+                });
+            }
+        });
+        
         // Track user's comments
         const USER_COMMENTS_KEY = 'linear_user_comments';
         
@@ -250,51 +662,44 @@
                 },
                 body: JSON.stringify(updateData)
             })
-            .then(response => {
-                // Check response type first to avoid JSON parsing errors with HTML responses
-                const contentType = response.headers.get("content-type");
-                if (contentType && contentType.indexOf("application/json") !== -1) {
-                    // Valid JSON response
-                    return response.json().then(data => {
-                        if (!response.ok) {
-                            throw new Error(data.error || `Server error: ${response.status}`);
-                        }
-                        return data;
-                    });
-                } else {
-                    // Not a JSON response (likely HTML error page)
-                    return response.text().then(text => {
-                        console.error('Non-JSON response:', text.substring(0, 150) + '...');
-                        throw new Error(`Server returned a non-JSON response. Status: ${response.status}`);
-                    });
-                }
-            })
+            .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    // Update the display
+                    // Update the UI
                     $('#issue-title-display').text(title);
-                    $('#issue-description-display').text(description || 'No description provided.');
                     
-                    // Switch back to view mode
-                    $('#issue-edit-mode').hide();
-                    $('#issue-view-mode').show();
+                    // Update description with rendered markdown
+                    const $descriptionDisplay = $('#issue-description-display');
+                    $descriptionDisplay.text(description);
+                    $descriptionDisplay.html(renderMarkdown(description));
                     
                     // Show success message
-                    const alertDiv = $('<div>')
+                    const successDiv = $('<div>')
                         .addClass('alert alert-success mt-3')
-                        .text('Issue updated successfully!')
-                        .appendTo($('#issue-view-mode'));
+                        .text('Issue updated successfully')
+                        .appendTo($('#issue-edit-mode'));
                     
-                    // Remove the alert after a few seconds
                     setTimeout(() => {
-                        alertDiv.fadeOut(function() {
+                        successDiv.fadeOut(function() {
                             $(this).remove();
                         });
-                        // Refresh the page to show updated state/assignee
-                        location.reload();
+                        
+                        // Switch back to view mode
+                        $('#issue-edit-mode').hide();
+                        $('#issue-view-mode').show();
                     }, 1500);
                 } else {
-                    throw new Error(data.error || 'Failed to update issue');
+                    // Show error message
+                    const errorDiv = $('<div>')
+                        .addClass('alert alert-danger mt-3')
+                        .text(`Error: ${data.error || 'Failed to update issue'}`)
+                        .appendTo($('#issue-edit-mode'));
+                    
+                    setTimeout(() => {
+                        errorDiv.fadeOut(function() {
+                            $(this).remove();
+                        });
+                    }, 3000);
                 }
             })
             .catch(error => {
@@ -303,38 +708,39 @@
                 // Show error message
                 const errorDiv = $('<div>')
                     .addClass('alert alert-danger mt-3')
-                    .text(`Error: ${error.message}`)
+                    .text(`Error: ${error.message || 'Network error'}`)
                     .appendTo($('#issue-edit-mode'));
                 
-                // Remove the error after a few seconds
                 setTimeout(() => {
                     errorDiv.fadeOut(function() {
                         $(this).remove();
                     });
-                }, 5000);
+                }, 3000);
             })
             .finally(() => {
-                // Re-enable the button
+                // Reset button
                 saveButton.prop('disabled', false).text(originalText);
             });
         });
         
-        // Comment form handling
+        // Comment handling
         $('#commentForm').submit(function(e) {
             e.preventDefault();
             
-            const issueId = '{{ issue.id }}';
-            const commentText = $('#comment').val();
-            
-            if (!commentText.trim()) {
-                alert('Please enter a comment.');
+            const commentText = $('#comment').val().trim();
+            if (!commentText) {
                 return;
             }
             
-            const statusDiv = document.getElementById('commentStatus');
-            statusDiv.innerHTML = '<div class="alert alert-info">Sending comment...</div>';
+            // Disable submit button
+            const submitBtn = $(this).find('button[type="submit"]');
+            submitBtn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Submitting...');
             
-            fetch('/api/add_comment/' + issueId, {
+            // Show status
+            $('#commentStatus').empty();
+            
+            // Send comment to API
+            fetch(`/api/add_comment/{{ issue.id }}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -346,35 +752,140 @@
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    // Success
-                    statusDiv.innerHTML = '<div class="alert alert-success">Comment added successfully!</div>';
-                    $('#comment').val('');
+                    // Create a new comment element
+                    const timestamp = new Date().toISOString();
+                    const formattedDate = new Date().toLocaleString();
                     
-                    // If there's a comment ID in the response, save it as a user comment
+                    // Store the comment ID
                     if (data.commentId) {
                         saveUserComment(data.commentId);
                     }
                     
-                    setTimeout(() => {
-                        window.location.reload();
-                    }, 1500);
-                } else {
-                    // Handle error from API
-                    console.error('Comment error:', data);
-                    let errorMessage = data.error || 'Could not add comment';
-                    statusDiv.innerHTML = `<div class="alert alert-danger">Error: ${errorMessage}</div>`;
+                    // Create the comment HTML with markdown rendering
+                    const commentHtml = `
+                        <div class="comment mb-3" data-comment-id="${data.commentId || ''}">
+                            <div class="comment-author d-flex justify-content-between">
+                                <div>
+                                    <span class="user-label badge bg-primary">You</span>
+                                    <span class="comment-date">${formattedDate}</span>
+                                </div>
+                                <button class="btn btn-sm btn-outline-danger delete-comment-btn" data-comment-id="${data.commentId || ''}">
+                                    <i class="fas fa-trash-alt"></i>
+                                </button>
+                            </div>
+                            <div class="comment-body markdown-content p-3 rounded">${commentText}</div>
+                        </div>
+                    `;
                     
-                    // Show fallback option to use Linear directly
+                    // Add to UI
+                    const $newComment = $(commentHtml);
+                    $('#comments-container').append($newComment);
+                    
+                    // Apply markdown rendering
+                    $newComment.find('.markdown-content').each(function() {
+                        $(this).html(renderMarkdown($(this).text()));
+                    });
+                    
+                    // Bind the delete event handler to the new comment's delete button
+                    $newComment.find('.delete-comment-btn').on('click', function() {
+                        const commentId = $(this).data('comment-id');
+                        const commentElement = $(this).closest('.comment');
+                        
+                        if (!commentId || !commentElement) {
+                            return;
+                        }
+                        
+                        // Show confirmation dialog
+                        if (confirm('Are you sure you want to delete this comment? This action cannot be undone.')) {
+                            // Add loading indicator to the comment
+                            const loadingOverlay = $('<div class="position-absolute top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center bg-white bg-opacity-75">')
+                                .append('<div class="spinner-border text-primary"></div>')
+                                .css('zIndex', 1000);
+                            
+                            commentElement.css('position', 'relative').append(loadingOverlay);
+                            
+                            // Send delete request
+                            fetch(`/api/delete_comment/${commentId}`, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json'
+                                }
+                            })
+                            .then(response => response.json())
+                            .then(data => {
+                                if (data.success) {
+                                    // Remove comment with animation
+                                    commentElement.fadeOut(300, function() {
+                                        $(this).remove();
+                                        
+                                        // Add a "no comments" message if all comments are gone
+                                        if ($('.comment').length === 0) {
+                                            $('#comments-container').html('<p class="text-muted">No comments yet.</p>');
+                                        }
+                                    });
+                                    
+                                    // Show success notification
+                                    const successMsg = $('<div class="alert alert-success position-fixed top-0 start-50 translate-middle-x p-3">')
+                                        .text('Comment has been deleted')
+                                        .appendTo('body');
+                                    
+                                    setTimeout(() => {
+                                        successMsg.fadeOut(() => successMsg.remove());
+                                    }, 3000);
+                                } else {
+                                    // Remove loading indicator
+                                    loadingOverlay.remove();
+                                    
+                                    const errorMsg = $('<div class="alert alert-danger position-fixed top-0 start-50 translate-middle-x p-3">')
+                                        .text(`Error: ${data.error || 'Failed to delete comment'}`)
+                                        .appendTo('body');
+                                    
+                                    setTimeout(() => {
+                                        errorMsg.fadeOut(() => errorMsg.remove());
+                                    }, 3000);
+                                }
+                            })
+                            .catch(error => {
+                                // Remove loading indicator
+                                loadingOverlay.remove();
+                                
+                                const errorMsg = $('<div class="alert alert-danger position-fixed top-0 start-50 translate-middle-x p-3">')
+                                    .text(`Error: ${error.message || 'Network error'}`)
+                                    .appendTo('body');
+                                
+                                setTimeout(() => {
+                                    errorMsg.fadeOut(() => errorMsg.remove());
+                                }, 3000);
+                            });
+                        }
+                    });
+                    
+                    // Clear comment form
+                    $('#comment').val('');
+                    
+                    // Show success message
+                    $('#commentStatus').html('<div class="alert alert-success">Comment added successfully</div>');
+                    
+                    // Remove the "No comments yet" message if it exists
+                    $('#comments-container .text-muted').remove();
+                } else {
+                    console.error('Error adding comment:', data.error);
+                    $('#commentStatus').html(`<div class="alert alert-danger">Error: ${data.error || 'Failed to add comment'}</div>`);
+                    
+                    // Show the fallback section
                     $('#fallbackCommentSection').show();
                 }
             })
             .catch(error => {
-                // Handle network errors
                 console.error('Network error:', error);
-                statusDiv.innerHTML = '<div class="alert alert-danger">Network error. Please try again.</div>';
+                $('#commentStatus').html(`<div class="alert alert-danger">Error: ${error.message || 'Network error'}</div>`);
                 
-                // Show fallback option for any errors
+                // Show the fallback section
                 $('#fallbackCommentSection').show();
+            })
+            .finally(() => {
+                // Re-enable submit button
+                submitBtn.prop('disabled', false).text('Add Comment');
             });
         });
     });

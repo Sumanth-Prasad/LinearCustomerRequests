@@ -4,23 +4,330 @@
 
 {% block head %}
 <style>
+    /* Prevent text selection throughout the roadmap */
+    .kanban-container,
+    .kanban-board,
+    .kanban-column,
+    .kanban-column-header,
+    .kanban-column-body,
+    .issue-card,
+    .issue-id,
+    .issue-title,
+    .issue-labels,
+    .issue-meta,
+    .filters-container,
+    .filter-group,
+    .filter-label,
+    .filter-badge,
+    .badge {
+        -webkit-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        user-select: none;
+    }
+    
     .kanban-container {
         overflow-x: auto;
         min-height: 700px;
     }
     .kanban-board {
         display: flex;
-        min-width: 100%;
+        width: 100%;
     }
     .kanban-column {
-        flex: 0 0 300px;
+        flex: 1;
+        min-width: 220px;
         margin-right: 15px;
+        min-height: 50px;
+        transition: all 0.2s ease-in-out;
     }
     .dragging {
         opacity: 0.5;
+        cursor: grabbing;
     }
     .drag-over {
-        background-color: #e9ecef;
+        background-color: rgba(13, 110, 253, 0.1);
+        border: 2px dashed #0d6efd;
+        border-radius: 0.25rem;
+        box-shadow: inset 0 0 10px rgba(13, 110, 253, 0.2);
+        transition: all 0.2s ease-in-out;
+    }
+    /* Ensure text in state headers is always visible */
+    .kanban-column-header {
+        font-weight: 700;
+    }
+    /* Light theme specific improvements for contrast */
+    [data-bs-theme="light"] .kanban-column-header {
+        /* Darken very light colors to ensure contrast */
+        filter: contrast(150%) brightness(0.9);
+        text-shadow: 0 0 2px rgba(0, 0, 0, 0.4);
+        /* Force better contrast regardless of background color */
+        color: #333333 !important;
+        border: 1px solid rgba(0, 0, 0, 0.2);
+    }
+    /* Colored left border to still show the state color */
+    [data-bs-theme="light"] .kanban-column-header:before {
+        content: "";
+        display: block;
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 6px;
+        height: 100%;
+        background-color: inherit;
+    }
+    /* Dark theme specific improvements */
+    [data-bs-theme="dark"] .kanban-column-header {
+        /* Brighten colors in dark mode for visibility */
+        filter: brightness(1.2) contrast(120%);
+        text-shadow: 0 0 2px rgba(0, 0, 0, 0.7);
+        color: #ffffff !important;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    /* Ensure state count badge is always visible */
+    .state-count {
+        color: #fff;
+        text-shadow: 0 0 2px rgba(0, 0, 0, 0.5);
+        font-weight: bold;
+        background-color: rgba(0, 0, 0, 0.3);
+    }
+    
+    /* Issue card enhancements */
+    .issue-card {
+        cursor: grab;
+        position: relative;
+        transition: all 0.2s ease;
+    }
+    
+    .issue-card:hover {
+        box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    }
+    
+    .issue-labels {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        margin-top: 8px;
+    }
+    
+    .issue-label {
+        font-size: 0.7rem;
+        padding: 1px 6px;
+        border-radius: 4px;
+        white-space: nowrap;
+        max-width: 100px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        font-weight: 500;
+    }
+    
+    .issue-meta {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-top: 8px;
+        font-size: 0.8rem;
+    }
+    
+    .issue-priority {
+        display: inline-block;
+        width: 14px;
+        height: 14px;
+        margin-right: 4px;
+        vertical-align: middle;
+    }
+    
+    .priority-urgent::before {
+        content: "🔴";
+    }
+    
+    .priority-high::before {
+        content: "🟠";
+    }
+    
+    .priority-medium::before {
+        content: "🟡";
+    }
+    
+    .priority-low::before {
+        content: "🟢";
+    }
+    
+    .git-info {
+        font-size: 0.75rem;
+        margin-top: 5px;
+    }
+    
+    .git-branch {
+        display: flex;
+        align-items: center;
+    }
+    
+    .git-branch i {
+        margin-right: 4px;
+    }
+    
+    /* Filter styles */
+    .filters-container {
+        margin-bottom: 20px;
+        background-color: rgba(0, 0, 0, 0.03);
+        border-radius: 8px;
+        padding: 15px;
+    }
+    
+    [data-bs-theme="dark"] .filters-container {
+        background-color: rgba(255, 255, 255, 0.05);
+    }
+    
+    .filter-group {
+        margin-bottom: 8px;
+    }
+    
+    .filter-label {
+        display: inline-block;
+        margin-right: 10px;
+        font-weight: 500;
+    }
+    
+    .filter-badge {
+        cursor: pointer;
+        margin: 0 2px;
+        opacity: 0.6;
+        transition: opacity 0.2s;
+    }
+    
+    .filter-badge:hover, .filter-badge.active {
+        opacity: 1;
+    }
+    
+    /* Add some basic styling for the delete button */
+    .delete-issue {
+        font-size: 0.8rem;
+        opacity: 0.6;
+        transition: opacity 0.2s;
+    }
+    
+    .delete-issue:hover {
+        opacity: 1;
+        color: #dc3545 !important;
+    }
+    
+    /* Context menu styles */
+    .context-menu {
+        min-width: 180px;
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+        border: 1px solid rgba(0, 0, 0, 0.1);
+        background-color: #fff;
+        padding: 0.5rem 0;
+    }
+    
+    .context-menu .dropdown-item {
+        padding: 0.5rem 1rem;
+        cursor: pointer;
+    }
+    
+    .context-menu .dropdown-item:hover {
+        background-color: #f8f9fa;
+    }
+    
+    [data-bs-theme="dark"] .context-menu {
+        background-color: #343a40;
+        border-color: rgba(255, 255, 255, 0.1);
+    }
+    
+    [data-bs-theme="dark"] .context-menu .dropdown-item {
+        color: #fff;
+    }
+    
+    [data-bs-theme="dark"] .context-menu .dropdown-item:hover {
+        background-color: #495057;
+    }
+    
+    /* Activity feed styles */
+    .activity-feed {
+        max-height: 70vh;
+        overflow-y: auto;
+    }
+    
+    .activity-date h6 {
+        position: sticky;
+        top: 0;
+        background-color: #f8f9fa;
+        padding: 8px 0;
+        margin: 0;
+        z-index: 1;
+    }
+    
+    [data-bs-theme="dark"] .activity-date h6 {
+        background-color: #343a40;
+    }
+    
+    .activity-feed .list-group-item {
+        border-left: 3px solid transparent;
+        transition: all 0.2s ease;
+    }
+    
+    .activity-feed .list-group-item:hover {
+        border-left-color: #0d6efd;
+    }
+    
+    .activity-feed .fa-plus-circle {
+        color: #198754;
+    }
+    
+    .activity-feed .fa-comment {
+        color: #0d6efd;
+    }
+    
+    .activity-feed .fa-exchange-alt {
+        color: #ffc107;
+    }
+    
+    .activity-feed .fa-user-edit {
+        color: #6f42c1;
+    }
+    
+    .activity-feed .fa-edit {
+        color: #6c757d;
+    }
+    
+    /* Activity button styles */
+    #activityButton {
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        transition: all 0.3s ease;
+    }
+    
+    #activityButton:hover {
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        transform: translateY(-2px);
+    }
+    
+    @keyframes pulse-glow {
+        0% { box-shadow: 0 2px 8px rgba(13, 110, 253, 0.4); }
+        50% { box-shadow: 0 2px 12px rgba(13, 110, 253, 0.7); }
+        100% { box-shadow: 0 2px 8px rgba(13, 110, 253, 0.4); }
+    }
+    
+    #activityButton {
+        animation: pulse-glow 2s infinite;
+    }
+    
+    [data-bs-theme="dark"] #activityButton {
+        animation: pulse-glow 2s infinite;
+    }
+    
+    /* Comment activity styles */
+    .activity-content {
+        flex: 1;
+    }
+    
+    .activity-time {
+        white-space: nowrap;
+        align-self: flex-start;
+    }
+    
+    [data-bs-theme="dark"] .activity-content .bg-light {
+        background-color: rgba(255, 255, 255, 0.05) !important;
     }
 </style>
 {% endblock %}
@@ -31,8 +338,12 @@
         <nav aria-label="breadcrumb">
             <ol class="breadcrumb">
                 <li class="breadcrumb-item"><a href="{{ url_for('index') }}">Teams</a></li>
-                <li class="breadcrumb-item"><a href="{{ url_for('projects', team_id=team_id) }}">Projects</a></li>
-                <li class="breadcrumb-item active">Roadmap</li>
+                {% if project_id %}
+                    <li class="breadcrumb-item"><a href="{{ url_for('projects', team_id=team_id) }}">Projects</a></li>
+                    <li class="breadcrumb-item active">{{ project_name if project_name else 'Project Roadmap' }}</li>
+                {% else %}
+                    <li class="breadcrumb-item active">Team Roadmap</li>
+                {% endif %}
             </ol>
         </nav>
     </div>
@@ -41,37 +352,162 @@
 <div class="row mb-4">
     <div class="col-12">
         <div class="card">
-            <div class="card-header">
-                <h3 class="card-title">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h3 class="card-title mb-0">
                     {% if project_id %}
-                    Project Issues Roadmap
+                    {{ project_name }} Roadmap
                     {% else %}
                     Team Issues Roadmap
                     {% endif %}
                 </h3>
+                {% if project_id %}
+                <a href="{{ url_for('roadmap', team_id=team_id) }}" class="btn btn-primary">
+                    <i class="fas fa-list"></i> View All Team Issues
+                </a>
+                {% endif %}
             </div>
         </div>
     </div>
 </div>
 
+<!-- Filters Section -->
+<div class="filters-container mb-4">
+    <div class="row">
+        <div class="col-md-6">
+            <div class="filter-group">
+                <span class="filter-label">Priority:</span>
+                <span class="badge filter-badge priority-filter" data-priority="4">Urgent</span>
+                <span class="badge filter-badge priority-filter" data-priority="3">High</span>
+                <span class="badge filter-badge priority-filter" data-priority="2">Medium</span>
+                <span class="badge filter-badge priority-filter" data-priority="1">Low</span>
+                <span class="badge bg-secondary filter-badge priority-filter" data-priority="0">None</span>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="filter-group" id="assigneeFilters">
+                <span class="filter-label">Assignees:</span>
+                <span class="badge bg-secondary filter-badge assignee-filter" data-assignee="unassigned">Unassigned</span>
+                <!-- Will be populated dynamically with available assignees -->
+            </div>
+        </div>
+    </div>
+    <div class="row mt-2">
+        <div class="col-12">
+            <div class="filter-group" id="labelFilters">
+                <span class="filter-label">Labels:</span>
+                <!-- Will be populated dynamically with available labels -->
+            </div>
+        </div>
+    </div>
+    <div class="row mt-3">
+        <div class="col-12">
+            <button class="btn btn-sm btn-outline-secondary" id="clearFilters">Clear Filters</button>
+            <span class="ms-3" id="activeFiltersCount"></span>
+            <button class="btn btn-sm btn-outline-danger ms-2" id="diagnoseButton">Diagnose API Connection</button>
+        </div>
+    </div>
+</div>
+
+<!-- Diagnostic Modal -->
+<div class="modal fade" id="diagnosticModal" tabindex="-1" aria-labelledby="diagnosticModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="diagnosticModalLabel">API Diagnostics</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div id="diagnosticResults">
+          <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+          <span class="ms-2">Running API diagnostics...</span>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Activity Feed Modal -->
+<div class="modal fade" id="activityModal" tabindex="-1" aria-labelledby="activityModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="activityModalLabel">Recent Activity</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div id="activityResults">
+          <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+          <span class="ms-2">Loading activity feed...</span>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Activity Feed Button (Fixed Position) -->
+<button class="btn btn-primary position-fixed" id="activityButton" style="top: 80px; right: 20px; z-index: 1000;">
+    <i class="fas fa-history"></i> Activity Feed
+</button>
+
 <div class="kanban-container">
     <div class="kanban-board">
         {% for state in workflow_states %}
         <div class="kanban-column" data-state-id="{{ state.id }}">
-            <div class="kanban-column-header" style="background-color: {{ state.color }}20; color: {{ state.color }};">
+            <div class="kanban-column-header position-relative" style="background-color: {{ state.color }}20; border-left-color: {{ state.color }};">
                 {{ state.name }}
-                <span class="badge bg-secondary ms-1">{{ issues_by_state[state.id]|length }}</span>
+                <span class="badge state-count ms-1">{{ issues_by_state[state.id]|length }}</span>
             </div>
             <div class="kanban-column-body p-2" data-state-id="{{ state.id }}">
                 {% for issue in issues_by_state[state.id] %}
-                <div class="issue-card" data-issue-id="{{ issue.id }}" style="border-left-color: {{ issue.state.color }};">
+                <div class="issue-card" 
+                     data-issue-id="{{ issue.id }}" 
+                     data-priority="{{ issue.priority }}"
+                     data-assignee-id="{{ issue.assignee.id if issue.assignee else 'unassigned' }}"
+                     {% if issue.labels and issue.labels.nodes %}
+                     data-labels="{{ issue.labels.nodes|map(attribute='name')|join(',') }}"
+                     {% else %}
+                     data-labels=""
+                     {% endif %}
+                     style="border-left-color: {{ issue.state.color }};"
+                     class="issue-card card mb-2 p-2 border-start border-3"
+                     draggable="true">
                     <div class="issue-id">{{ issue.identifier }}</div>
                     <div class="issue-title">{{ issue.title }}</div>
-                    {% if issue.assignee %}
-                    <div class="issue-assignee">
-                        <i class="fas fa-user-circle me-1"></i> {{ issue.assignee.displayName or issue.assignee.name }}
+                    
+                    <!-- Labels display -->
+                    {% if issue.labels and issue.labels.nodes %}
+                    <div class="issue-labels">
+                        {% for label in issue.labels.nodes %}
+                        <span class="issue-label" style="background-color: {{ label.color }};">{{ label.name }}</span>
+                        {% endfor %}
                     </div>
                     {% endif %}
+                    
+                    <div class="issue-meta">
+                        <!-- Priority indicator -->
+                        <div class="issue-info">
+                            {% if issue.priority > 0 %}
+                            <span class="issue-priority priority-{{ issue.priorityLabel|lower }}" title="{{ issue.priorityLabel }} Priority"></span>
+                            {% endif %}
+                            
+                            <!-- Assignee (if any) -->
+                            {% if issue.assignee %}
+                            <span class="issue-assignee">
+                                <i class="fas fa-user-circle"></i> {{ issue.assignee.displayName or issue.assignee.name }}
+                            </span>
+                            {% endif %}
+                        </div>
+                    </div>
                 </div>
                 {% endfor %}
             </div>
@@ -84,6 +520,263 @@
 {% block scripts %}
 <script>
     $(document).ready(function() {
+        // Prevent text selection on drag
+        document.addEventListener('dragstart', function(e) {
+            e.target.style.cursor = 'grabbing';
+            
+            // Prevent text selection during drag
+            document.body.style.userSelect = 'none';
+            document.body.style.webkitUserSelect = 'none';
+            document.body.style.mozUserSelect = 'none';
+            document.body.style.msUserSelect = 'none';
+        });
+        
+        document.addEventListener('dragend', function(e) {
+            e.target.style.cursor = 'grab';
+            
+            // Restore text selection after drag
+            document.body.style.userSelect = '';
+            document.body.style.webkitUserSelect = '';
+            document.body.style.mozUserSelect = '';
+            document.body.style.msUserSelect = '';
+        });
+        
+        // Variables to store drag information
+        let draggedItem = null;
+        let originalColumn = null;
+        
+        // Create and append context menu
+        const contextMenu = $('<div>')
+            .addClass('dropdown-menu context-menu')
+            .css({
+                position: 'absolute',
+                zIndex: 1000,
+                display: 'none'
+            })
+            .append(
+                $('<a>')
+                    .addClass('dropdown-item text-danger')
+                    .attr('href', '#')
+                    .attr('id', 'delete-issue')
+                    .html('<i class="fas fa-trash-alt me-2"></i>Delete Issue')
+            )
+            .appendTo('body');
+        
+        let contextIssueId = null;
+        let contextIssueCard = null;
+        
+        // Right-click menu for issues
+        $('.issue-card').on('contextmenu', function(e) {
+            e.preventDefault();
+            
+            // Hide any visible context menu
+            contextMenu.hide();
+            
+            // Store issue details
+            contextIssueCard = $(this);
+            contextIssueId = $(this).data('issue-id');
+            
+            // Position and show context menu
+            contextMenu.css({
+                top: e.pageY + 'px',
+                left: e.pageX + 'px'
+            }).show();
+            
+            // Hide menu when clicking elsewhere
+            $(document).one('click', function() {
+                contextMenu.hide();
+            });
+        });
+        
+        // Handle delete action from context menu
+        $('#delete-issue').on('click', function(e) {
+            e.preventDefault();
+            
+            if (!contextIssueId || !contextIssueCard) return;
+            
+            const issueIdentifier = contextIssueCard.find('.issue-id').text();
+            
+            // Show confirmation dialog
+            if (confirm(`Are you sure you want to delete issue ${issueIdentifier}? This action cannot be undone.`)) {
+                // Show loading indicator on the card
+                const loadingOverlay = $('<div class="position-absolute top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center bg-white bg-opacity-75">')
+                    .append('<div class="spinner-border text-primary"></div>')
+                    .css('zIndex', 1000);
+                
+                contextIssueCard.css('position', 'relative').append(loadingOverlay);
+                
+                // Send delete request
+                fetch(`/api/delete_issue/${contextIssueId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Remove card with animation
+                        contextIssueCard.fadeOut(300, function() {
+                            $(this).remove();
+                            updateColumnCounts();
+                        });
+                        
+                        // Show success notification
+                        const successMsg = $('<div class="alert alert-success position-fixed top-0 start-50 translate-middle-x p-3">')
+                            .text(`Issue ${issueIdentifier} has been deleted.`)
+                            .appendTo('body');
+                        
+                        setTimeout(() => {
+                            successMsg.fadeOut(() => successMsg.remove());
+                        }, 3000);
+                    } else {
+                        // Remove loading overlay
+                        loadingOverlay.remove();
+                        
+                        const errorMsg = $('<div class="alert alert-danger position-fixed top-0 start-50 translate-middle-x p-3">')
+                            .text(`Error: ${data.error || 'Failed to delete issue'}`)
+                            .appendTo('body');
+                        
+                        setTimeout(() => {
+                            errorMsg.fadeOut(() => errorMsg.remove());
+                        }, 3000);
+                    }
+                })
+                .catch(error => {
+                    // Remove loading overlay
+                    loadingOverlay.remove();
+                    
+                    const errorMsg = $('<div class="alert alert-danger position-fixed top-0 start-50 translate-middle-x p-3">')
+                        .text(`Error: ${error.message || 'Network error'}`)
+                        .appendTo('body');
+                    
+                    setTimeout(() => {
+                        errorMsg.fadeOut(() => errorMsg.remove());
+                    }, 3000);
+                });
+            }
+        });
+        
+        // Drag and drop functionality 
+        $('.issue-card').on('dragstart', function(e) {
+            // Set the dragged item and store its original column
+            draggedItem = $(this);
+            originalColumn = $(this).closest('.kanban-column-body');
+            
+            // Add dragging class for visual cue
+            $(this).addClass('dragging');
+            
+            // Set data for drag operation
+            e.originalEvent.dataTransfer.setData('text/plain', $(this).data('issue-id'));
+            e.originalEvent.dataTransfer.effectAllowed = 'move';
+        });
+        
+        $('.issue-card').on('dragend', function() {
+            // Remove dragging class when drag ends
+            $(this).removeClass('dragging');
+        });
+        
+        // Make the entire column droppable, not just the visible cards
+        $('.kanban-column').on('dragover', function(e) {
+            e.preventDefault();
+            $(this).addClass('drag-over');
+        });
+        
+        $('.kanban-column').on('dragleave', function() {
+            $(this).removeClass('drag-over');
+        });
+        
+        $('.kanban-column').on('drop', function(e) {
+            e.preventDefault();
+            $(this).removeClass('drag-over');
+            
+            if (!draggedItem) return;
+            
+            const targetColumn = $(this).find('.kanban-column-body');
+            const targetStateId = targetColumn.data('state-id');
+            const issueId = draggedItem.data('issue-id');
+            
+            // If dropped in the same column, do nothing
+            if (targetColumn.is(originalColumn)) {
+                return;
+            }
+            
+            // Show loading indicator
+            const loadingOverlay = $('<div class="position-absolute top-0 start-0 w-100 h-100 d-flex justify-content-center align-items-center bg-white bg-opacity-75">')
+                .append('<div class="spinner-border text-primary"></div>')
+                .css('zIndex', 1000);
+            
+            draggedItem.css('position', 'relative').append(loadingOverlay);
+            
+            // Update issue state via API
+            fetch(`/api/update_issue/${issueId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    stateId: targetStateId
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                loadingOverlay.remove();
+                
+                if (data.success) {
+                    // Move the card to the new column
+                    draggedItem.detach().appendTo(targetColumn);
+                    
+                    // Update the counters
+                    updateColumnCounts();
+                    
+                    // Add a flash effect to show success
+                    draggedItem.addClass('bg-success bg-opacity-10')
+                        .delay(500)
+                        .queue(function(next) {
+                            $(this).removeClass('bg-success bg-opacity-10');
+                            next();
+                        });
+                } else {
+                    // Show error notification
+                    const errorMsg = $('<div class="alert alert-danger position-fixed top-0 start-50 translate-middle-x p-3">')
+                        .text(`Error: ${data.error || 'Failed to update issue'}`)
+                        .appendTo('body');
+                    
+                    setTimeout(() => {
+                        errorMsg.fadeOut(() => errorMsg.remove());
+                    }, 3000);
+                    
+                    // Add error flash
+                    draggedItem.addClass('bg-danger bg-opacity-10')
+                        .delay(500)
+                        .queue(function(next) {
+                            $(this).removeClass('bg-danger bg-opacity-10');
+                            next();
+                        });
+                }
+            })
+            .catch(error => {
+                loadingOverlay.remove();
+                
+                // Show error notification
+                const errorMsg = $('<div class="alert alert-danger position-fixed top-0 start-50 translate-middle-x p-3">')
+                    .text(`Error: ${error.message || 'Network error'}`)
+                    .appendTo('body');
+                
+                setTimeout(() => {
+                    errorMsg.fadeOut(() => errorMsg.remove());
+                }, 3000);
+                
+                // Add error flash
+                draggedItem.addClass('bg-danger bg-opacity-10')
+                    .delay(500)
+                    .queue(function(next) {
+                        $(this).removeClass('bg-danger bg-opacity-10');
+                        next();
+                    });
+            });
+        });
+        
         // Redirect to issue details when clicking on an issue card
         $('.issue-card').click(function() {
             const issueId = $(this).data('issue-id');
@@ -120,6 +813,454 @@
             const x = e.pageX - kanbanContainer.offsetLeft;
             const walk = (x - startX) * 1.5;
             kanbanContainer.scrollLeft = scrollLeft - walk;
+        });
+        
+        // Diagnostic button click handler
+        $('#diagnoseButton').click(function() {
+            // Show the modal
+            const modal = new bootstrap.Modal(document.getElementById('diagnosticModal'));
+            modal.show();
+            
+            // Reset the results area
+            $('#diagnosticResults').html(`
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <span class="ms-2">Running API diagnostics...</span>
+            `);
+            
+            // Make the API call
+            $.get('/api/diagnose', function(data) {
+                // Format the results in a user-friendly way
+                let resultsHtml = '<div class="card">';
+                
+                // Overall connectivity
+                if (data.api_accessible) {
+                    resultsHtml += `<div class="card-header bg-success text-white">
+                        <i class="fas fa-check-circle"></i> API Connected - User: ${data.user_name}
+                    </div>`;
+                } else {
+                    resultsHtml += `<div class="card-header bg-danger text-white">
+                        <i class="fas fa-exclamation-triangle"></i> API Connection Failed
+                    </div>`;
+                }
+                
+                // Authentication details
+                resultsHtml += `<div class="card-body">
+                    <h5>Authentication</h5>
+                    <ul>
+                        <li>API Key Present: ${data.has_api_key ? 'Yes' : 'No'}</li>
+                        <li>OAuth Configured: ${data.has_oauth_config ? 'Yes' : 'No'}</li>
+                        <li>User Session Active: ${data.has_user_session ? 'Yes' : 'No'}</li>
+                    </ul>
+                    
+                    <h5>Data Access</h5>
+                    <ul>
+                        <li>Can Fetch Teams: ${data.can_fetch_teams ? 'Yes' : 'No'}</li>
+                        <li>Team Count: ${data.team_count || 0}</li>
+                        <li>Can Fetch Issues: ${data.can_fetch_issues ? 'Yes' : 'No'}</li>
+                        <li>Issue Count: ${data.issue_count || 0}</li>
+                    </ul>`;
+                
+                // Sample issue information if available
+                if (data.sample_issue) {
+                    resultsHtml += `
+                    <h5>Sample Issue Data</h5>
+                    <ul>
+                        <li>ID: ${data.sample_issue.id}</li>
+                        <li>Title: ${data.sample_issue.title}</li>
+                        <li>Has State Data: ${data.sample_issue.has_state ? 'Yes' : 'No'}</li>
+                        <li>Has Assignee Data: ${data.sample_issue.has_assignee ? 'Yes' : 'No'}</li>
+                        <li>Has Labels Data: ${data.sample_issue.has_labels ? 'Yes' : 'No'}</li>
+                    </ul>`;
+                }
+                
+                // Error information if any
+                if (data.api_error || data.fetch_error) {
+                    resultsHtml += `
+                    <h5 class="text-danger">Errors</h5>
+                    <ul>
+                        ${data.api_error ? `<li>API Error: ${data.api_error}</li>` : ''}
+                        ${data.fetch_error ? `<li>Fetch Error: ${data.fetch_error}</li>` : ''}
+                    </ul>`;
+                }
+                
+                // Full data dump
+                resultsHtml += `
+                    <div class="mt-3">
+                        <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#fullDataDump">
+                            Show Full Data
+                        </button>
+                        <div class="collapse mt-2" id="fullDataDump">
+                            <div class="card card-body">
+                                <pre>${JSON.stringify(data, null, 2)}</pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+                
+                // Update the modal content
+                $('#diagnosticResults').html(resultsHtml);
+            })
+            .fail(function(error) {
+                $('#diagnosticResults').html(`
+                    <div class="alert alert-danger">
+                        <strong>Error:</strong> Failed to run diagnostics. 
+                        <p>${error.responseText || 'Unknown error'}</p>
+                    </div>
+                `);
+            });
+        });
+        
+        // Filtering functionality
+        const activeFilters = {
+            priorities: [],
+            assignees: [],
+            labels: []
+        };
+        
+        // Function to apply filters
+        function applyFilters() {
+            $('.issue-card').each(function() {
+                const $card = $(this);
+                const priority = $card.data('priority').toString();
+                const assigneeId = $card.data('assignee-id');
+                const labels = $card.data('labels') ? $card.data('labels').split(',') : [];
+                
+                // Default to showing the card
+                let show = true;
+                
+                // Check priority filter
+                if (activeFilters.priorities.length > 0 && !activeFilters.priorities.includes(priority)) {
+                    show = false;
+                }
+                
+                // Check assignee filter
+                if (activeFilters.assignees.length > 0 && !activeFilters.assignees.includes(assigneeId)) {
+                    show = false;
+                }
+                
+                // Check label filters (any matching label is enough)
+                if (activeFilters.labels.length > 0) {
+                    const hasMatchingLabel = labels.some(label => 
+                        activeFilters.labels.includes(label.trim())
+                    );
+                    if (!hasMatchingLabel) {
+                        show = false;
+                    }
+                }
+                
+                // Show or hide the card
+                $card.toggle(show);
+            });
+            
+            // Update counters
+            updateColumnCounts();
+            updateActiveFiltersCount();
+        }
+        
+        // Update the count badges on each column
+        function updateColumnCounts() {
+            $('.kanban-column').each(function() {
+                const $column = $(this);
+                const stateId = $column.data('state-id');
+                const visibleCards = $column.find('.issue-card:visible').length;
+                $column.find('.state-count').text(visibleCards);
+            });
+        }
+        
+        // Update active filters count display
+        function updateActiveFiltersCount() {
+            const totalActiveFilters = 
+                activeFilters.priorities.length + 
+                activeFilters.assignees.length + 
+                activeFilters.labels.length;
+                
+            if (totalActiveFilters > 0) {
+                $('#activeFiltersCount').text(`${totalActiveFilters} active filters`);
+            } else {
+                $('#activeFiltersCount').text('');
+            }
+        }
+        
+        // Priority filter click handler
+        $('.priority-filter').click(function() {
+            const priority = $(this).data('priority').toString();
+            
+            if ($(this).hasClass('active')) {
+                // Remove from active filters
+                activeFilters.priorities = activeFilters.priorities.filter(p => p !== priority);
+                $(this).removeClass('active');
+            } else {
+                // Add to active filters
+                activeFilters.priorities.push(priority);
+                $(this).addClass('active');
+            }
+            
+            applyFilters();
+        });
+        
+        // Assignee filter click handler
+        $(document).on('click', '.assignee-filter', function() {
+            const assigneeId = $(this).data('assignee');
+            
+            if ($(this).hasClass('active')) {
+                // Remove from active filters
+                activeFilters.assignees = activeFilters.assignees.filter(a => a !== assigneeId);
+                $(this).removeClass('active');
+            } else {
+                // Add to active filters
+                activeFilters.assignees.push(assigneeId);
+                $(this).addClass('active');
+            }
+            
+            applyFilters();
+        });
+        
+        // Label filter click handler
+        $(document).on('click', '.label-filter', function() {
+            const label = $(this).data('label');
+            
+            if ($(this).hasClass('active')) {
+                // Remove from active filters
+                activeFilters.labels = activeFilters.labels.filter(l => l !== label);
+                $(this).removeClass('active');
+            } else {
+                // Add to active filters
+                activeFilters.labels.push(label);
+                $(this).addClass('active');
+            }
+            
+            applyFilters();
+        });
+        
+        // Clear all filters
+        $('#clearFilters').click(function() {
+            activeFilters.priorities = [];
+            activeFilters.assignees = [];
+            activeFilters.labels = [];
+            
+            $('.filter-badge').removeClass('active');
+            applyFilters();
+        });
+        
+        // Dynamic creation of filter options
+        function setupFilters() {
+            // Get all unique assignees
+            const assignees = new Map();
+            $('.issue-card').each(function() {
+                const $card = $(this);
+                if ($card.find('.issue-assignee').length) {
+                    const assigneeId = $card.data('assignee-id');
+                    const assigneeName = $card.find('.issue-assignee').text().trim();
+                    if (assigneeId && !assignees.has(assigneeId)) {
+                        assignees.set(assigneeId, assigneeName);
+                    }
+                }
+            });
+            
+            // Add assignee filters
+            assignees.forEach((name, id) => {
+                $('#assigneeFilters').append(
+                    `<span class="badge bg-secondary filter-badge assignee-filter" data-assignee="${id}">${name}</span>`
+                );
+            });
+            
+            // Get all unique labels
+            const labels = new Set();
+            $('.issue-label').each(function() {
+                const label = $(this).text().trim();
+                if (label) {
+                    labels.add(label);
+                }
+            });
+            
+            // Add label filters
+            labels.forEach(label => {
+                // Find a label element with this text to get its color
+                const $labelElem = $(`.issue-label:contains("${label}")`).first();
+                const color = $labelElem.css('background-color');
+                
+                $('#labelFilters').append(
+                    `<span class="badge filter-badge label-filter" data-label="${label}" style="background-color: ${color}">${label}</span>`
+                );
+            });
+        }
+        
+        // Set up filters on page load
+        setupFilters();
+        
+        // Activity feed button click handler
+        $('#activityButton').click(function() {
+            // Show the modal
+            const modal = new bootstrap.Modal(document.getElementById('activityModal'));
+            modal.show();
+            
+            // Reset the results area
+            $('#activityResults').html(`
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <span class="ms-2">Loading activity feed...</span>
+            `);
+            
+            // Make the API call to get recent activity
+            fetch('/api/get_activity{% if project_id %}?project_id={{ project_id }}{% endif %}')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        let activityHtml = '<div class="activity-feed">';
+                        
+                        if (data.activities && data.activities.length > 0) {
+                            // Group activities by date
+                            const groupedActivities = {};
+                            
+                            data.activities.forEach(activity => {
+                                const date = new Date(activity.createdAt);
+                                const dateStr = date.toLocaleDateString();
+                                
+                                if (!groupedActivities[dateStr]) {
+                                    groupedActivities[dateStr] = [];
+                                }
+                                
+                                groupedActivities[dateStr].push(activity);
+                            });
+                            
+                            // Generate HTML for each date group
+                            Object.keys(groupedActivities).sort((a, b) => {
+                                // Sort dates in descending order (newest first)
+                                return new Date(b) - new Date(a);
+                            }).forEach(dateStr => {
+                                activityHtml += `
+                                    <div class="activity-date mb-3">
+                                        <h6 class="text-muted">${dateStr}</h6>
+                                        <div class="list-group">
+                                `;
+                                
+                                // Activities for this date
+                                groupedActivities[dateStr].forEach(activity => {
+                                    let iconClass = 'fas fa-info-circle text-info';
+                                    let activityText = '';
+                                    let timestamp = new Date(activity.createdAt).toLocaleTimeString();
+                                    let issueLink = '';
+                                    
+                                    if (activity.issue) {
+                                        issueLink = `<a href="/issue/${activity.issue.id}" class="fw-bold">${activity.issue.identifier}</a>`;
+                                    }
+                                    
+                                    switch (activity.type) {
+                                        case 'issue_created':
+                                            iconClass = 'fas fa-plus-circle text-success';
+                                            activityText = `
+                                                <div>
+                                                    <div><strong>${activity.user.name}</strong> created issue ${issueLink}</div>
+                                                    <div class="mt-1 text-muted small fw-normal">
+                                                        ${activity.issue.title}
+                                                    </div>
+                                                </div>
+                                            `;
+                                            break;
+                                        case 'comment_created':
+                                            iconClass = 'fas fa-comment text-primary';
+                                            activityText = `
+                                                <div>
+                                                    <div><strong>${activity.user.name}</strong> commented on ${issueLink}</div>
+                                                    <div class="mt-1 text-muted small fw-normal">
+                                                        ${activity.issue.title}
+                                                    </div>
+                                                    <div class="mt-1 p-2 border-start border-primary border-3 bg-light bg-opacity-25 rounded">
+                                                        <em>${activity.comment.substring(0, 150)}${activity.comment.length > 150 ? '...' : ''}</em>
+                                                    </div>
+                                                </div>
+                                            `;
+                                            break;
+                                        case 'state_changed':
+                                            iconClass = 'fas fa-exchange-alt text-warning';
+                                            activityText = `
+                                                <div>
+                                                    <div><strong>${activity.user.name}</strong> moved ${issueLink} from "${activity.fromState}" to "${activity.toState}"</div>
+                                                    <div class="mt-1 text-muted small fw-normal">
+                                                        ${activity.issue.title}
+                                                    </div>
+                                                </div>
+                                            `;
+                                            break;
+                                        case 'assignee_changed':
+                                            iconClass = 'fas fa-user-edit text-info';
+                                            let actionText = activity.toAssignee ? 
+                                                `assigned ${issueLink} to ${activity.toAssignee.name}` : 
+                                                `unassigned ${issueLink}`;
+                                            activityText = `
+                                                <div>
+                                                    <div><strong>${activity.user.name}</strong> ${actionText}</div>
+                                                    <div class="mt-1 text-muted small fw-normal">
+                                                        ${activity.issue.title}
+                                                    </div>
+                                                </div>
+                                            `;
+                                            break;
+                                        case 'issue_updated':
+                                            iconClass = 'fas fa-edit text-secondary';
+                                            activityText = `
+                                                <div>
+                                                    <div><strong>${activity.user.name}</strong> updated ${issueLink}</div>
+                                                    <div class="mt-1 text-muted small fw-normal">
+                                                        ${activity.issue.title}
+                                                    </div>
+                                                </div>
+                                            `;
+                                            break;
+                                        default:
+                                            activityText = `${activity.user.name} performed action on ${issueLink}`;
+                                    }
+                                    
+                                    activityHtml += `
+                                        <div class="list-group-item list-group-item-action">
+                                            <div class="d-flex w-100 justify-content-between">
+                                                <div class="activity-content">
+                                                    <i class="${iconClass} me-2"></i>
+                                                    ${activityText}
+                                                </div>
+                                                <small class="text-muted ms-2 activity-time">${timestamp}</small>
+                                            </div>
+                                        </div>
+                                    `;
+                                });
+                                
+                                activityHtml += `
+                                        </div>
+                                    </div>
+                                `;
+                            });
+                        } else {
+                            activityHtml += `
+                                <div class="alert alert-info">
+                                    No recent activity available.
+                                </div>
+                            `;
+                        }
+                        
+                        activityHtml += '</div>';
+                        
+                        // Update the modal content
+                        $('#activityResults').html(activityHtml);
+                    } else {
+                        // Show error message
+                        $('#activityResults').html(`
+                            <div class="alert alert-danger">
+                                <strong>Error:</strong> ${data.error || 'Failed to load activity feed.'}
+                            </div>
+                        `);
+                    }
+                })
+                .catch(error => {
+                    // Show error message
+                    $('#activityResults').html(`
+                        <div class="alert alert-danger">
+                            <strong>Error:</strong> ${error.message || 'Network error. Please try again.'}
+                        </div>
+                    `);
+                });
         });
     });
 </script>
