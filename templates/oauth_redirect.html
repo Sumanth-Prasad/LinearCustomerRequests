@@ -1,0 +1,47 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <div class="card">
+                <div class="card-header">
+                    <h3>Linear OAuth Authentication</h3>
+                </div>
+                <div class="card-body">
+                    <h4>Authorization URL</h4>
+                    <p>You're being redirected to Linear to authorize this application.</p>
+                    
+                    <div class="alert alert-secondary">
+                        <p><strong>URL:</strong> <small class="text-break">{{ auth_url }}</small></p>
+                    </div>
+                    
+                    <div class="mt-4">
+                        <a href="{{ auth_url }}" class="btn btn-primary">Continue to Linear Authorization</a>
+                        <a href="{{ url_for('index') }}" class="btn btn-outline-secondary ml-2">Cancel</a>
+                    </div>
+                    
+                    <hr>
+                    
+                    <h5>Debugging Information</h5>
+                    <ul>
+                        <li><strong>Client ID:</strong> {{ LINEAR_CLIENT_ID[:5] + '...' if LINEAR_CLIENT_ID else 'Not set' }}</li>
+                        <li><strong>Redirect URI:</strong> {{ LINEAR_REDIRECT_URI }}</li>
+                        <li><strong>Scopes:</strong> issues:write, comments:write, read</li>
+                    </ul>
+                    
+                    <div class="alert alert-info">
+                        <h5>Common Issues</h5>
+                        <ol>
+                            <li>Ensure your redirect URI matches exactly in Linear OAuth app settings</li>
+                            <li>Check that your client ID and secret are correct</li>
+                            <li>Verify cookies are enabled in your browser</li>
+                            <li>If using private browsing, try in a regular window</li>
+                        </ol>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

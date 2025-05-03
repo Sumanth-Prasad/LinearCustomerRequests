@@ -1737,35 +1737,65 @@ def api_echo():
 @app.route('/login')
 def login():
     """Initiate Linear OAuth flow"""
-    if not LINEAR_CLIENT_ID or not LINEAR_CLIENT_SECRET:
-        app.logger.error("Linear OAuth credentials not configured")
-        flash("Linear OAuth is not configured. Please set LINEAR_CLIENT_ID and LINEAR_CLIENT_SECRET in your .env file.", "danger")
-        return redirect(url_for('index'))
+    try:
+        app.logger.info("Login route accessed")
         
-    # Create a random state value to prevent CSRF
-    state = secrets.token_hex(16)
-    session['oauth_state'] = state
-    
-    # If we're using ngrok, make sure to use the current tunnel URL for the redirect
-    redirect_uri = LINEAR_REDIRECT_URI
-    
-    app.logger.info(f"Initiating OAuth flow with redirect URI: {redirect_uri}")
-    
-    auth_url = (
-        f"https://linear.app/oauth/authorize"
-        f"?client_id={LINEAR_CLIENT_ID}"
-        f"&redirect_uri={redirect_uri}"
-        f"&scope=issues:write,comments:write"
-        f"&state={state}"
-        f"&response_type=code"
-    )
-    
-    app.logger.info(f"Redirecting to Linear auth URL: {auth_url}")
-    return redirect(auth_url)
+        if not LINEAR_CLIENT_ID or not LINEAR_CLIENT_SECRET:
+            app.logger.error("Linear OAuth credentials not configured")
+            flash("Linear OAuth is not configured. Please set LINEAR_CLIENT_ID and LINEAR_CLIENT_SECRET in your .env file.", "danger")
+            return redirect(url_for('index'))
+            
+        # Create a random state value to prevent CSRF
+        state = secrets.token_hex(16)
+        session['oauth_state'] = state
+        
+        # Log session info for debugging
+        app.logger.info(f"Session cookie set: {request.cookies.get('session') is not None}")
+        app.logger.info(f"Generated state: {state}")
+        
+        # If we're using ngrok, make sure to use the current tunnel URL for the redirect
+        redirect_uri = LINEAR_REDIRECT_URI
+        
+        app.logger.info(f"Initiating OAuth flow with redirect URI: {redirect_uri}")
+        
+        # Build the authorization URL
+        auth_url = (
+            f"https://linear.app/oauth/authorize"
+            f"?client_id={LINEAR_CLIENT_ID}"
+            f"&redirect_uri={redirect_uri}"
+            f"&scope=issues:write,comments:write,read"
+            f"&state={state}"
+            f"&response_type=code"
+        )
+        
+        app.logger.info(f"Redirecting to Linear auth URL: {auth_url}")
+        
+        # Create a dedicated page that shows the URL and a button to proceed
+        # This helps troubleshoot by showing the exact URL being used
+        return render_template(
+            'oauth_redirect.html', 
+            auth_url=auth_url,
+            LINEAR_CLIENT_ID=LINEAR_CLIENT_ID,
+            LINEAR_REDIRECT_URI=LINEAR_REDIRECT_URI
+        )
+        
+        # Original direct redirect
+        # return redirect(auth_url)
+    except Exception as e:
+        app.logger.error(f"Exception in login route: {str(e)}")
+        app.logger.error(traceback.format_exc())
+        flash(f"An error occurred when initiating login: {str(e)}", "danger")
+        return redirect(url_for('index'))
 
 @app.route('/auth/callback')
 def auth_callback():
     """Handle Linear OAuth callback"""
+    # Log all request details for debugging
+    app.logger.info("OAuth callback received")
+    app.logger.info(f"Full URL: {request.url}")
+    app.logger.info(f"Query params: {request.args}")
+    app.logger.info(f"Headers: {dict(request.headers)}")
+    
     # Verify state to prevent CSRF
     state = request.args.get('state')
     error = request.args.get('error')
@@ -1804,9 +1834,17 @@ def auth_callback():
         app.logger.info(f"Exchanging auth code for token with payload: {json.dumps(token_payload)}")
         
         token_response = requests.post(token_url, json=token_payload)
-        token_data = token_response.json()
-        
         app.logger.info(f"Token response status: {token_response.status_code}")
+        app.logger.info(f"Token response headers: {dict(token_response.headers)}")
+        app.logger.info(f"Token response body: {token_response.text}")
+        
+        # Try to parse the JSON response, but handle non-JSON responses
+        try:
+            token_data = token_response.json()
+        except json.JSONDecodeError:
+            app.logger.error(f"Failed to parse token response as JSON: {token_response.text}")
+            flash("Error parsing response from Linear. Please check server logs.", "danger")
+            return redirect(url_for('index'))
         
         if 'error' in token_data or token_response.status_code != 200:
             app.logger.error(f"Error getting access token: {token_data}")
