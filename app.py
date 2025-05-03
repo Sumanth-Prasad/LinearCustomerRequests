@@ -1839,7 +1839,8 @@ def auth_callback():
         
         app.logger.info(f"Exchanging auth code for token with payload: {json.dumps(token_payload)}")
         
-        token_response = requests.post(token_url, json=token_payload)
+        # Use data parameter instead of json for x-www-form-urlencoded content type
+        token_response = requests.post(token_url, data=token_payload)
         app.logger.info(f"Token response status: {token_response.status_code}")
         app.logger.info(f"Token response headers: {dict(token_response.headers)}")
         app.logger.info(f"Token response body: {token_response.text}")
@@ -1968,7 +1969,7 @@ def refresh_access_token(refresh_token):
         "grant_type": "refresh_token"
     }
     
-    response = requests.post(token_url, json=payload)
+    response = requests.post(token_url, data=payload)
     
     if response.status_code == 200:
         return response.json()
