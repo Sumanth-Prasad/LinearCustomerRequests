@@ -8,6 +8,7 @@ import requests
 from datetime import datetime, timedelta
 from dateutil import parser
 import traceback
+import urllib.parse
 
 # Conditionally import pyngrok
 ngrok_available = False
@@ -1758,14 +1759,19 @@ def login():
         
         app.logger.info(f"Initiating OAuth flow with redirect URI: {redirect_uri}")
         
+        # URL encode the redirect URI to ensure proper formatting
+        encoded_redirect_uri = urllib.parse.quote(redirect_uri, safe='')
+        
         # Build the authorization URL
         auth_url = (
             f"https://linear.app/oauth/authorize"
             f"?client_id={LINEAR_CLIENT_ID}"
-            f"&redirect_uri={redirect_uri}"
-            f"&scope=issues:write,comments:write,read"
+            f"&redirect_uri={encoded_redirect_uri}"
+            f"&scope=read,comments:create,issues:create"  # Correct scopes
             f"&state={state}"
             f"&response_type=code"
+            f"&prompt=consent"  # Force consent screen
+            f"&actor=user"  # Explicitly set actor
         )
         
         app.logger.info(f"Redirecting to Linear auth URL: {auth_url}")
@@ -2012,6 +2018,48 @@ def oauth_setup_help():
         tunnel_options=tunnel_options,
         config_path=config_path,
         current_redirect_uri=LINEAR_REDIRECT_URI
+    )
+
+@app.route('/debug/test-linear-auth')
+def debug_test_linear_auth():
+    """A debug page to test Linear OAuth authentication directly"""
+    # Generate a secure state
+    state = secrets.token_hex(16)
+    session['oauth_state'] = state
+    
+    # Import here to avoid circular import
+    import urllib.parse
+    
+    # Get the redirect URI
+    redirect_uri = LINEAR_REDIRECT_URI
+    encoded_redirect_uri = urllib.parse.quote(redirect_uri, safe='')
+    
+    # Build URLs with different scope combinations to test
+    test_urls = [
+        {
+            'name': 'Basic Read Only',
+            'url': f"https://linear.app/oauth/authorize?client_id={LINEAR_CLIENT_ID}&redirect_uri={encoded_redirect_uri}&scope=read&state={state}&response_type=code&prompt=consent&actor=user"
+        },
+        {
+            'name': 'Read + Comments Create',
+            'url': f"https://linear.app/oauth/authorize?client_id={LINEAR_CLIENT_ID}&redirect_uri={encoded_redirect_uri}&scope=read,comments:create&state={state}&response_type=code&prompt=consent&actor=user"
+        },
+        {
+            'name': 'Read + Issues Create',
+            'url': f"https://linear.app/oauth/authorize?client_id={LINEAR_CLIENT_ID}&redirect_uri={encoded_redirect_uri}&scope=read,issues:create&state={state}&response_type=code&prompt=consent&actor=user"
+        },
+        {
+            'name': 'All Permissions',
+            'url': f"https://linear.app/oauth/authorize?client_id={LINEAR_CLIENT_ID}&redirect_uri={encoded_redirect_uri}&scope=read,comments:create,issues:create,write&state={state}&response_type=code&prompt=consent&actor=user"
+        }
+    ]
+    
+    return render_template(
+        'debug_linear_auth.html', 
+        test_urls=test_urls,
+        LINEAR_CLIENT_ID=LINEAR_CLIENT_ID,
+        LINEAR_REDIRECT_URI=LINEAR_REDIRECT_URI,
+        encoded_redirect_uri=encoded_redirect_uri
     )
 
 if __name__ == '__main__':
