@@ -1,0 +1,126 @@
+{% extends "layout.html" %}
+
+{% block title %} - Issue Roadmap{% endblock %}
+
+{% block head %}
+<style>
+    .kanban-container {
+        overflow-x: auto;
+        min-height: 700px;
+    }
+    .kanban-board {
+        display: flex;
+        min-width: 100%;
+    }
+    .kanban-column {
+        flex: 0 0 300px;
+        margin-right: 15px;
+    }
+    .dragging {
+        opacity: 0.5;
+    }
+    .drag-over {
+        background-color: #e9ecef;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+    <div class="col-12">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('index') }}">Teams</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('projects', team_id=team_id) }}">Projects</a></li>
+                <li class="breadcrumb-item active">Roadmap</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    {% if project_id %}
+                    Project Issues Roadmap
+                    {% else %}
+                    Team Issues Roadmap
+                    {% endif %}
+                </h3>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="kanban-container">
+    <div class="kanban-board">
+        {% for state in workflow_states %}
+        <div class="kanban-column" data-state-id="{{ state.id }}">
+            <div class="kanban-column-header" style="background-color: {{ state.color }}20; color: {{ state.color }};">
+                {{ state.name }}
+                <span class="badge bg-secondary ms-1">{{ issues_by_state[state.id]|length }}</span>
+            </div>
+            <div class="kanban-column-body p-2" data-state-id="{{ state.id }}">
+                {% for issue in issues_by_state[state.id] %}
+                <div class="issue-card" data-issue-id="{{ issue.id }}" style="border-left-color: {{ issue.state.color }};">
+                    <div class="issue-id">{{ issue.identifier }}</div>
+                    <div class="issue-title">{{ issue.title }}</div>
+                    {% if issue.assignee %}
+                    <div class="issue-assignee">
+                        <i class="fas fa-user-circle me-1"></i> {{ issue.assignee.displayName or issue.assignee.name }}
+                    </div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    $(document).ready(function() {
+        // Redirect to issue details when clicking on an issue card
+        $('.issue-card').click(function() {
+            const issueId = $(this).data('issue-id');
+            window.location.href = "{{ url_for('issue_details', issue_id='__ISSUE_ID__') }}".replace('__ISSUE_ID__', issueId);
+        });
+        
+        // Make the board scrollable horizontally
+        let isDown = false;
+        let startX;
+        let scrollLeft;
+        
+        const kanbanContainer = document.querySelector('.kanban-container');
+        
+        kanbanContainer.addEventListener('mousedown', (e) => {
+            isDown = true;
+            kanbanContainer.style.cursor = 'grabbing';
+            startX = e.pageX - kanbanContainer.offsetLeft;
+            scrollLeft = kanbanContainer.scrollLeft;
+        });
+        
+        kanbanContainer.addEventListener('mouseleave', () => {
+            isDown = false;
+            kanbanContainer.style.cursor = 'default';
+        });
+        
+        kanbanContainer.addEventListener('mouseup', () => {
+            isDown = false;
+            kanbanContainer.style.cursor = 'default';
+        });
+        
+        kanbanContainer.addEventListener('mousemove', (e) => {
+            if (!isDown) return;
+            e.preventDefault();
+            const x = e.pageX - kanbanContainer.offsetLeft;
+            const walk = (x - startX) * 1.5;
+            kanbanContainer.scrollLeft = scrollLeft - walk;
+        });
+    });
+</script>
+{% endblock %} 

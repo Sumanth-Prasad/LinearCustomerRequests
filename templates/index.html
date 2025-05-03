@@ -1,0 +1,50 @@
+{% extends "layout.html" %}
+
+{% block title %} - Teams{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8 offset-md-2">
+        {% if session.get('user') %}
+            <div class="alert alert-success mb-4">
+                <h4>Logged in as {{ session.user.displayName or session.user.name }}</h4>
+                <p>Comments you create will be attributed to your Linear account.</p>
+                <a href="{{ url_for('logout') }}" class="btn btn-outline-dark btn-sm">Log out</a>
+            </div>
+        {% else %}
+            <div class="alert alert-info mb-4">
+                <h4>Not logged in</h4>
+                <p>You can view and manage issues, but comments will be created via the API without user attribution.</p>
+                <div class="mt-2">
+                    <a href="{{ url_for('login') }}" class="btn btn-primary btn-sm me-2">Log in with Linear</a>
+                    <a href="{{ url_for('oauth_setup_help') }}" class="btn btn-outline-dark btn-sm">OAuth Setup Help</a>
+                </div>
+            </div>
+        {% endif %}
+        
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Select a Team</h3>
+            </div>
+            <div class="card-body">
+                {% if teams %}
+                    <div class="list-group">
+                        {% for team in teams %}
+                            <a href="{{ url_for('projects', team_id=team.id) }}" class="list-group-item list-group-item-action">
+                                <div class="d-flex w-100 justify-content-between">
+                                    <h5 class="mb-1">{{ team.name }}</h5>
+                                </div>
+                                <small class="text-muted">Team ID: {{ team.id }}</small>
+                            </a>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="alert alert-warning">
+                        No teams found. Please check your Linear API key and permissions.
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

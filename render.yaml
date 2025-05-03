@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: linear-roadmap
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    envVars:
+      - key: FLASK_SECRET_KEY
+        generateValue: true
+      - key: LINEAR_API_KEY
+        sync: false
+      - key: LINEAR_CLIENT_ID
+        sync: false
+      - key: LINEAR_CLIENT_SECRET
+        sync: false
+      - key: LINEAR_REDIRECT_URI
+        sync: false 

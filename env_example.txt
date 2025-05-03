@@ -1,0 +1,14 @@
+# Flask configuration
+FLASK_SECRET_KEY=your_secure_random_key_here
+
+# Linear API configuration
+LINEAR_API_KEY=your_linear_api_key
+
+# Linear OAuth configuration
+LINEAR_CLIENT_ID=your_linear_oauth_app_client_id
+LINEAR_CLIENT_SECRET=your_linear_oauth_app_client_secret
+LINEAR_REDIRECT_URI=http://localhost:5000/auth/callback
+
+# Ngrok configuration (for development)
+ENABLE_NGROK=True
+NGROK_AUTH_TOKEN=your_ngrok_auth_token  # Optional but recommended 

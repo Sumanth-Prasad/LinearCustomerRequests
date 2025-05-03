@@ -1,0 +1,105 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1>Linear OAuth Setup Guide</h1>
+    
+    <div class="alert alert-info">
+        <h4>Current Configuration</h4>
+        <p>Redirect URI: <code>{{ current_redirect_uri }}</code></p>
+    </div>
+    
+    <div class="card mb-4">
+        <div class="card-header">
+            <h2>Step 1: Create a Tunnel</h2>
+        </div>
+        <div class="card-body">
+            <p>Linear requires HTTPS URLs for OAuth callbacks. For local development, you need to create a tunnel to your local server.</p>
+            
+            <h4>Tunnel Options:</h4>
+            <div class="row">
+                {% for option in tunnel_options %}
+                <div class="col-md-4 mb-3">
+                    <div class="card h-100">
+                        <div class="card-header">
+                            <h5>{{ option.name }}</h5>
+                        </div>
+                        <div class="card-body">
+                            <p><a href="{{ option.url }}" target="_blank">{{ option.url }}</a></p>
+                            <h6>Command:</h6>
+                            <pre><code>{{ option.command }}</code></pre>
+                            <p class="text-muted">{{ option.notes }}</p>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="card mb-4">
+        <div class="card-header">
+            <h2>Step 2: Create a Linear OAuth App</h2>
+        </div>
+        <div class="card-body">
+            <ol>
+                <li>Go to <a href="https://linear.app/settings/api/applications/new" target="_blank">Linear API Settings</a></li>
+                <li>Create a new OAuth Application</li>
+                <li>Set the following fields:
+                    <ul>
+                        <li><strong>Name:</strong> Your application name</li>
+                        <li><strong>Redirect URLs:</strong> Use the tunnel URL you created followed by <code>/auth/callback</code> (e.g., <code>https://12ab-34-567-89-0.ngrok.io/auth/callback</code>)</li>
+                        <li><strong>OAuth Scope:</strong> Required access permissions for your app (at minimum: <code>read</code>, <code>issues:write</code>, <code>comments:write</code>)</li>
+                    </ul>
+                </li>
+                <li>After creating the app, copy the <strong>Client ID</strong> and <strong>Client Secret</strong></li>
+            </ol>
+        </div>
+    </div>
+    
+    <div class="card mb-4">
+        <div class="card-header">
+            <h2>Step 3: Update Environment Variables</h2>
+        </div>
+        <div class="card-body">
+            <p>Update your <code>.env</code> file at <code>{{ config_path }}</code> with the following values:</p>
+            
+            <pre><code># Linear OAuth configuration
+LINEAR_CLIENT_ID=your_client_id_from_linear
+LINEAR_CLIENT_SECRET=your_client_secret_from_linear
+LINEAR_REDIRECT_URI=your_tunnel_url/auth/callback</code></pre>
+            
+            <div class="alert alert-warning">
+                <p><strong>Note:</strong> If using ngrok or similar services, the tunnel URL will change each time you restart the tunnel unless you have a paid account.</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="card mb-4">
+        <div class="card-header">
+            <h2>Step 4: Restart the Application</h2>
+        </div>
+        <div class="card-body">
+            <p>After setting up the tunnel and configuring your environment variables, restart your Flask application:</p>
+            
+            <pre><code>python app.py</code></pre>
+            
+            <p>Then visit <a href="/login">Login with Linear</a> to test your configuration.</p>
+        </div>
+    </div>
+    
+    <div class="card mb-4">
+        <div class="card-header">
+            <h2>Troubleshooting</h2>
+        </div>
+        <div class="card-body">
+            <ul>
+                <li>Check your OAuth configuration at <a href="/debug/oauth-config">/debug/oauth-config</a></li>
+                <li>Ensure your redirect URL exactly matches what's configured in Linear</li>
+                <li>Verify that your tunnel is working by visiting it directly</li>
+                <li>Check server logs for detailed error messages</li>
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %} 

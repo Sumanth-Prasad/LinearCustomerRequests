@@ -1,0 +1,382 @@
+{% extends "layout.html" %}
+
+{% block title %} - Issue Details{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+    <div class="col-12">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('index') }}">Teams</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('projects', team_id=issue.team.id) }}">Projects</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('roadmap', team_id=issue.team.id) }}">Roadmap</a></li>
+                <li class="breadcrumb-item active">{{ issue.identifier }}</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h3 class="card-title mb-0">{{ issue.identifier }} <span id="issue-title-display">{{ issue.title }}</span></h3>
+                <button class="btn btn-sm btn-outline-primary" id="edit-issue-btn">
+                    <i class="fas fa-edit"></i> Edit
+                </button>
+            </div>
+            <div class="card-body">
+                <div id="issue-view-mode">
+                    <p class="mb-3"><strong>Description:</strong></p>
+                    <div class="p-3 bg-light rounded" id="issue-description-display">{{ issue.description or 'No description provided.' }}</div>
+                </div>
+                
+                <div id="issue-edit-mode" style="display: none;">
+                    <form id="issue-edit-form">
+                        <div class="mb-3">
+                            <label for="issue-title" class="form-label">Title</label>
+                            <input type="text" class="form-control" id="issue-title" value="{{ issue.title }}">
+                        </div>
+                        <div class="mb-3">
+                            <label for="issue-description" class="form-label">Description</label>
+                            <textarea class="form-control" id="issue-description" rows="6">{{ issue.description }}</textarea>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="issue-state" class="form-label">State</label>
+                                <select class="form-select" id="issue-state">
+                                    {% for state in workflow_states %}
+                                    <option value="{{ state.id }}" {% if state.id == issue.state.id %}selected{% endif %}>{{ state.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="issue-assignee" class="form-label">Assignee</label>
+                                <select class="form-select" id="issue-assignee">
+                                    <option value="">Unassigned</option>
+                                    {% for member in team_members %}
+                                    <option value="{{ member.id }}" {% if issue.assignee and member.id == issue.assignee.id %}selected{% endif %}>{{ member.displayName or member.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="d-flex justify-content-end">
+                            <button type="button" class="btn btn-secondary me-2" id="cancel-edit-btn">Cancel</button>
+                            <button type="submit" class="btn btn-primary">Save Changes</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h4 class="card-title">Comments</h4>
+            </div>
+            <div class="card-body">
+                <div id="comments-container">
+                    {% if issue.comments and issue.comments.nodes %}
+                        {% for comment in issue.comments.nodes %}
+                        <div class="comment mb-3" data-comment-id="{{ comment.id }}">
+                            <div class="comment-author">
+                                {% if comment.user %}
+                                {{ comment.user.displayName or comment.user.name }}
+                                {% else %}
+                                <span class="user-label badge bg-secondary">Added via API</span>
+                                {% endif %}
+                                <span class="comment-date">{{ comment.createdAt|format_date }}</span>
+                            </div>
+                            <div class="comment-body">{{ comment.body }}</div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <p class="text-muted">No comments yet.</p>
+                    {% endif %}
+                </div>
+                
+                <div class="comment-form mt-4">
+                    <h5>Add a Comment</h5>
+                    <form id="commentForm">
+                        <div class="mb-3">
+                            <textarea class="form-control" id="comment" rows="3" placeholder="Type your comment here..." required></textarea>
+                        </div>
+                        <div class="mt-3">
+                            <button type="submit" class="btn btn-primary">Add Comment</button>
+                            <div id="commentStatus" class="mt-2"></div>
+                        </div>
+                    </form>
+                    
+                    <div class="mt-4 fallback-comment-section" style="display:none;" id="fallbackCommentSection">
+                        <div class="alert alert-warning">
+                            <p><strong>Couldn't create comment via API.</strong> This might be due to API permission limitations.</p>
+                            <p>As an alternative, you can add your comment directly in Linear:</p>
+                            <a href="https://linear.app/{{ issue.team.name|lower }}/issue/{{ issue.identifier }}" target="_blank" class="btn btn-outline-primary">
+                                Open in Linear <i class="bi bi-box-arrow-up-right"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card mb-3">
+            <div class="card-header">
+                <h4 class="card-title">Issue Details</h4>
+            </div>
+            <div class="card-body">
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <span>Identifier</span>
+                        <span class="badge bg-primary">{{ issue.identifier }}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <span>Status</span>
+                        <span class="badge" style="background-color: {{ issue.state.color }};">{{ issue.state.name }}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <span>Assignee</span>
+                        <span>{{ issue.assignee.displayName or issue.assignee.name if issue.assignee else 'Unassigned' }}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <span>Team</span>
+                        <span>{{ issue.team.name }}</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    $(document).ready(function() {
+        // Track user's comments
+        const USER_COMMENTS_KEY = 'linear_user_comments';
+        
+        // Load user comments from localStorage
+        function getUserComments() {
+            const saved = localStorage.getItem(USER_COMMENTS_KEY);
+            return saved ? JSON.parse(saved) : [];
+        }
+        
+        // Save a comment ID to localStorage
+        function saveUserComment(commentId) {
+            const comments = getUserComments();
+            if (!comments.includes(commentId)) {
+                comments.push(commentId);
+                localStorage.setItem(USER_COMMENTS_KEY, JSON.stringify(comments));
+            }
+        }
+        
+        // Check if a comment was created by the current user
+        function isUserComment(commentId) {
+            return getUserComments().includes(commentId);
+        }
+        
+        // Update comment labels - change "Added via API" to "You" for user comments
+        function updateCommentLabels() {
+            $('.comment').each(function() {
+                const commentId = $(this).data('comment-id');
+                if (commentId && isUserComment(commentId)) {
+                    $(this).find('.user-label')
+                           .removeClass('bg-secondary')
+                           .addClass('bg-primary')
+                           .text('You');
+                }
+            });
+        }
+        
+        // Run on page load
+        updateCommentLabels();
+        
+        // Issue editing
+        $('#edit-issue-btn').click(function() {
+            $('#issue-view-mode').hide();
+            $('#issue-edit-mode').show();
+        });
+        
+        $('#cancel-edit-btn').click(function() {
+            $('#issue-edit-mode').hide();
+            $('#issue-view-mode').show();
+        });
+        
+        $('#issue-edit-form').submit(function(e) {
+            e.preventDefault();
+            
+            const issueId = '{{ issue.id }}';
+            const title = $('#issue-title').val().trim();
+            const description = $('#issue-description').val().trim();
+            const stateId = $('#issue-state').val();
+            const assigneeId = $('#issue-assignee').val() || null;
+            
+            // Validate required fields
+            if (!title) {
+                const errorDiv = $('<div>')
+                    .addClass('alert alert-danger mt-3')
+                    .text('Title is required')
+                    .appendTo($('#issue-edit-mode'));
+                
+                setTimeout(() => {
+                    errorDiv.fadeOut(function() {
+                        $(this).remove();
+                    });
+                }, 3000);
+                return;
+            }
+            
+            // Show a loading indicator
+            const saveButton = $(this).find('button[type="submit"]');
+            const originalText = saveButton.text();
+            saveButton.prop('disabled', true).text('Saving...');
+            
+            // Prepare data for API
+            const updateData = {
+                title: title,
+                description: description,
+                stateId: stateId,
+                assigneeId: assigneeId
+            };
+            
+            // Log the data being sent for debugging
+            console.log('Updating issue with data:', updateData);
+            
+            fetch(`/api/update_issue/${issueId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(updateData)
+            })
+            .then(response => {
+                // Check response type first to avoid JSON parsing errors with HTML responses
+                const contentType = response.headers.get("content-type");
+                if (contentType && contentType.indexOf("application/json") !== -1) {
+                    // Valid JSON response
+                    return response.json().then(data => {
+                        if (!response.ok) {
+                            throw new Error(data.error || `Server error: ${response.status}`);
+                        }
+                        return data;
+                    });
+                } else {
+                    // Not a JSON response (likely HTML error page)
+                    return response.text().then(text => {
+                        console.error('Non-JSON response:', text.substring(0, 150) + '...');
+                        throw new Error(`Server returned a non-JSON response. Status: ${response.status}`);
+                    });
+                }
+            })
+            .then(data => {
+                if (data.success) {
+                    // Update the display
+                    $('#issue-title-display').text(title);
+                    $('#issue-description-display').text(description || 'No description provided.');
+                    
+                    // Switch back to view mode
+                    $('#issue-edit-mode').hide();
+                    $('#issue-view-mode').show();
+                    
+                    // Show success message
+                    const alertDiv = $('<div>')
+                        .addClass('alert alert-success mt-3')
+                        .text('Issue updated successfully!')
+                        .appendTo($('#issue-view-mode'));
+                    
+                    // Remove the alert after a few seconds
+                    setTimeout(() => {
+                        alertDiv.fadeOut(function() {
+                            $(this).remove();
+                        });
+                        // Refresh the page to show updated state/assignee
+                        location.reload();
+                    }, 1500);
+                } else {
+                    throw new Error(data.error || 'Failed to update issue');
+                }
+            })
+            .catch(error => {
+                console.error('Error updating issue:', error);
+                
+                // Show error message
+                const errorDiv = $('<div>')
+                    .addClass('alert alert-danger mt-3')
+                    .text(`Error: ${error.message}`)
+                    .appendTo($('#issue-edit-mode'));
+                
+                // Remove the error after a few seconds
+                setTimeout(() => {
+                    errorDiv.fadeOut(function() {
+                        $(this).remove();
+                    });
+                }, 5000);
+            })
+            .finally(() => {
+                // Re-enable the button
+                saveButton.prop('disabled', false).text(originalText);
+            });
+        });
+        
+        // Comment form handling
+        $('#commentForm').submit(function(e) {
+            e.preventDefault();
+            
+            const issueId = '{{ issue.id }}';
+            const commentText = $('#comment').val();
+            
+            if (!commentText.trim()) {
+                alert('Please enter a comment.');
+                return;
+            }
+            
+            const statusDiv = document.getElementById('commentStatus');
+            statusDiv.innerHTML = '<div class="alert alert-info">Sending comment...</div>';
+            
+            fetch('/api/add_comment/' + issueId, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    comment: commentText
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Success
+                    statusDiv.innerHTML = '<div class="alert alert-success">Comment added successfully!</div>';
+                    $('#comment').val('');
+                    
+                    // If there's a comment ID in the response, save it as a user comment
+                    if (data.commentId) {
+                        saveUserComment(data.commentId);
+                    }
+                    
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1500);
+                } else {
+                    // Handle error from API
+                    console.error('Comment error:', data);
+                    let errorMessage = data.error || 'Could not add comment';
+                    statusDiv.innerHTML = `<div class="alert alert-danger">Error: ${errorMessage}</div>`;
+                    
+                    // Show fallback option to use Linear directly
+                    $('#fallbackCommentSection').show();
+                }
+            })
+            .catch(error => {
+                // Handle network errors
+                console.error('Network error:', error);
+                statusDiv.innerHTML = '<div class="alert alert-danger">Network error. Please try again.</div>';
+                
+                // Show fallback option for any errors
+                $('#fallbackCommentSection').show();
+            });
+        });
+    });
+</script>
+{% endblock %} 
