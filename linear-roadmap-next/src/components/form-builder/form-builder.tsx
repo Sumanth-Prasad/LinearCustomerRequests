@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 type FieldType = "text" | "textarea" | "select" | "checkbox" | "radio" | "email" | "phone" | "file" | "image";
 
@@ -508,7 +510,7 @@ export function FormBuilder() {
     
     return (
       <div 
-        className="fixed z-50 bg-white dark:bg-gray-800 border border-border rounded-md shadow-lg p-2 w-64 max-h-60 overflow-y-auto"
+        className="fixed z-50 rounded-md shadow-lg w-64 overflow-hidden border border-border"
         style={{
           top: `${mentionMenu.position.top}px`,
           left: `${mentionMenu.position.left}px`,
@@ -516,33 +518,36 @@ export function FormBuilder() {
         }}
         onClick={(e) => e.stopPropagation()} // Prevent clicks from bubbling to the document
       >
-        <div className="sticky top-0 bg-white dark:bg-gray-800 px-2 py-1 border-b border-border mb-1">
-          <input 
-            type="text" 
-            className="w-full p-1 text-sm border rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100" 
-            placeholder="Search..."
+        <Command className="rounded-lg border shadow-md">
+          <CommandInput 
+            placeholder="Search fields..." 
             value={mentionMenu.searchTerm}
-            onChange={(e) => setMentionMenu({...mentionMenu, searchTerm: e.target.value})}
-            autoFocus
+            onValueChange={(value) => setMentionMenu({...mentionMenu, searchTerm: value})}
+            className="h-9"
           />
-        </div>
-        <div className="space-y-1">
-          {filteredFields.map(field => (
-            <div 
-              key={field.id}
-              className="px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md cursor-pointer flex items-center"
-              onClick={() => handleMentionSelect(field.id)}
-            >
-              <div className="mr-2 text-gray-500 dark:text-gray-400">
-                {getFieldTypeIcon(field.type)}
-              </div>
-              <div>
-                <div className="font-medium text-gray-900 dark:text-gray-100">{field.label}</div>
-                <div className="text-xs text-gray-500 dark:text-gray-400">{field.type}</div>
-              </div>
-            </div>
-          ))}
-        </div>
+          <CommandList>
+            <CommandEmpty>No fields found</CommandEmpty>
+            <CommandGroup>
+              <ScrollArea className="h-[200px]">
+                {filteredFields.map(field => (
+                  <CommandItem
+                    key={field.id}
+                    onSelect={() => handleMentionSelect(field.id)}
+                    className="flex items-center gap-2 px-2"
+                  >
+                    <div className="text-muted-foreground flex-shrink-0">
+                      {getFieldTypeIcon(field.type)}
+                    </div>
+                    <div>
+                      <p className="font-medium">{field.label}</p>
+                      <p className="text-xs text-muted-foreground">{field.type}</p>
+                    </div>
+                  </CommandItem>
+                ))}
+              </ScrollArea>
+            </CommandGroup>
+          </CommandList>
+        </Command>
       </div>
     );
   };
