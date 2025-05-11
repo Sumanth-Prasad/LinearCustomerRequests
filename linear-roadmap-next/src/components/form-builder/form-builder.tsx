@@ -147,7 +147,8 @@ export function FormBuilder() {
           })()
         : textWidth;
       
-      // Position the menu right after the @ symbol - directly using the viewport position
+      // Position the menu right after the @ symbol - using client coordinates (viewport position)
+      // These coordinates are relative to the viewport and won't be affected by scrolling
       const position = {
         top: inputRect.top + (isTextarea ? linesBefore * lineHeight + lineHeight : inputRect.height),
         left: inputRect.left + (isTextarea && lastNewlineIndex !== -1 ? textWidthInCurrentLine : textWidth),
@@ -268,6 +269,74 @@ export function FormBuilder() {
     }
   };
   
+  // Handle scrolling to keep mention menu positioned correctly
+  useEffect(() => {
+    const updateMentionMenuPosition = () => {
+      if (mentionMenu.isOpen && mentionMenu.inputId) {
+        const input = inputRefs.current.get(mentionMenu.inputId);
+        if (!input) return;
+        
+        const value = input.value;
+        const caretPosition = input.selectionStart || 0;
+        
+        // Find the @ symbol position
+        const textBeforeCaret = value.substring(0, caretPosition);
+        const atSymbolIndex = textBeforeCaret.lastIndexOf('@');
+        
+        if (atSymbolIndex !== -1) {
+          // Recalculate position using the same logic as in handleInputChange
+          const tempSpan = document.createElement('span');
+          tempSpan.style.font = window.getComputedStyle(input).font;
+          tempSpan.style.position = 'absolute';
+          tempSpan.style.visibility = 'hidden';
+          tempSpan.textContent = textBeforeCaret.substring(0, atSymbolIndex + 1);
+          document.body.appendChild(tempSpan);
+          
+          const inputRect = input.getBoundingClientRect();
+          const textWidth = tempSpan.getBoundingClientRect().width;
+          document.body.removeChild(tempSpan);
+          
+          const isTextarea = input.tagName.toLowerCase() === 'textarea';
+          const lineHeight = parseInt(window.getComputedStyle(input).lineHeight) || 20;
+          const linesBefore = isTextarea ? textBeforeCaret.split('\n').length - 1 : 0;
+          
+          const lastNewlineIndex = isTextarea ? textBeforeCaret.lastIndexOf('\n') : -1;
+          const textWidthInCurrentLine = isTextarea && lastNewlineIndex !== -1 
+            ? (() => {
+                const lineText = textBeforeCaret.substring(lastNewlineIndex + 1, atSymbolIndex + 1);
+                const lineSpan = document.createElement('span');
+                lineSpan.style.font = window.getComputedStyle(input).font;
+                lineSpan.style.position = 'absolute';
+                lineSpan.style.visibility = 'hidden';
+                lineSpan.textContent = lineText;
+                document.body.appendChild(lineSpan);
+                const width = lineSpan.getBoundingClientRect().width;
+                document.body.removeChild(lineSpan);
+                return width;
+              })()
+            : textWidth;
+          
+          // Update position
+          setMentionMenu({
+            ...mentionMenu,
+            position: {
+              top: inputRect.top + (isTextarea ? linesBefore * lineHeight + lineHeight : inputRect.height),
+              left: inputRect.left + (isTextarea && lastNewlineIndex !== -1 ? textWidthInCurrentLine : textWidth),
+            }
+          });
+        }
+      }
+    };
+    
+    // Add scroll event listener
+    window.addEventListener('scroll', updateMentionMenuPosition, true);
+    
+    // Clean up
+    return () => {
+      window.removeEventListener('scroll', updateMentionMenuPosition, true);
+    };
+  }, [mentionMenu]);
+
   // Close the mention menu if clicking outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -443,6 +512,7 @@ export function FormBuilder() {
         style={{
           top: `${mentionMenu.position.top}px`,
           left: `${mentionMenu.position.left}px`,
+          position: 'fixed' // Explicitly set fixed position to override any inheritance
         }}
         onClick={(e) => e.stopPropagation()} // Prevent clicks from bubbling to the document
       >
