@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { MentionCombobox } from "@/components/ui/mention-combobox";
 
 type FieldType = "text" | "textarea" | "select" | "checkbox" | "radio" | "email" | "phone" | "file" | "image";
 
@@ -98,9 +99,9 @@ export function FormBuilder() {
 
   // Handle @ mention detection in input/textarea
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>, fieldId: string) => {
-    const input = e.target;
-    const value = input.value;
-    const caretPosition = input.selectionStart || 0;
+    const inputElement = e.target;
+    const value = inputElement.value;
+    const caretPosition = inputElement.selectionStart || 0;
     
     // Check if we have an @ symbol before the caret
     const textBeforeCaret = value.substring(0, caretPosition);
@@ -113,19 +114,19 @@ export function FormBuilder() {
       // Get exact position of the @ symbol for better positioning
       // This requires creating a temporary span to measure text width
       const tempSpan = document.createElement('span');
-      tempSpan.style.font = window.getComputedStyle(input).font;
+      tempSpan.style.font = window.getComputedStyle(inputElement).font;
       tempSpan.style.position = 'absolute';
       tempSpan.style.visibility = 'hidden';
       tempSpan.textContent = textBeforeCaret.substring(0, atSymbolIndex + 1); // Include the @ symbol
       document.body.appendChild(tempSpan);
       
-      const inputRect = input.getBoundingClientRect();
+      const inputRect = inputElement.getBoundingClientRect();
       const textWidth = tempSpan.getBoundingClientRect().width;
       document.body.removeChild(tempSpan);
       
       // Calculate offsets based on input type
-      const isTextarea = input.tagName.toLowerCase() === 'textarea';
-      const lineHeight = parseInt(window.getComputedStyle(input).lineHeight) || 20;
+      const isTextarea = inputElement.tagName.toLowerCase() === 'textarea';
+      const lineHeight = parseInt(window.getComputedStyle(inputElement).lineHeight) || 20;
       
       // Count newlines before the caret to calculate vertical offset for textareas
       const linesBefore = isTextarea 
@@ -138,7 +139,7 @@ export function FormBuilder() {
         ? (() => {
             const lineText = textBeforeCaret.substring(lastNewlineIndex + 1, atSymbolIndex + 1);
             const lineSpan = document.createElement('span');
-            lineSpan.style.font = window.getComputedStyle(input).font;
+            lineSpan.style.font = window.getComputedStyle(inputElement).font;
             lineSpan.style.position = 'absolute';
             lineSpan.style.visibility = 'hidden';
             lineSpan.textContent = lineText;
@@ -169,91 +170,72 @@ export function FormBuilder() {
       }
     }
     
-    // Now update the field value
-    updateField(fieldId, { placeholder: value });
+    // Update field or linear settings based on the field ID
+    if (fieldId === 'response_message') {
+      setLinearSettings({...linearSettings, responseMessage: value});
+    } else if (fieldId === 'default_title') {
+      setLinearSettings({...linearSettings, defaultTitle: value});
+    } else {
+      // It's a regular form field
+      updateField(fieldId, { placeholder: value });
+    }
   };
   
   // Handle selection from the mention menu
   const handleMentionSelect = (selectedFieldId: string) => {
+    console.log('Selected Field ID:', selectedFieldId);
     if (!mentionMenu.inputId) return;
     
     // Get the selected field label
     const selectedField = fields.find(f => f.id === selectedFieldId);
+    console.log('Selected Field:', selectedField);
     if (!selectedField) return;
     
-    // Special handling for Linear settings fields
-    if (mentionMenu.inputId === 'response_message' || mentionMenu.inputId === 'default_title') {
-      const input = inputRefs.current.get(mentionMenu.inputId);
-      if (!input) return;
-      
-      const value = input.value;
-      const caretPosition = input.selectionStart || 0;
-      
-      // Find the last @ symbol before the caret
-      const textBeforeCaret = value.substring(0, caretPosition);
-      const atSymbolIndex = textBeforeCaret.lastIndexOf('@');
-      
-      if (atSymbolIndex !== -1) {
-        // Create a formatted reference
-        const formattedReference = `@${selectedField.label}`;
-        
-        // Replace the @searchTerm with the selected field reference
-        const newValue = value.substring(0, atSymbolIndex) + 
-                       formattedReference + 
-                       value.substring(caretPosition);
-        
-        // Update the appropriate field in Linear settings
-        if (mentionMenu.inputId === 'response_message') {
-          setLinearSettings({...linearSettings, responseMessage: newValue});
-        } else if (mentionMenu.inputId === 'default_title') {
-          setLinearSettings({...linearSettings, defaultTitle: newValue});
-        }
-        
-        // Close the menu
-        setMentionMenu({ ...mentionMenu, isOpen: false });
-        
-        // Set focus back to input and position caret after the inserted mention
-        setTimeout(() => {
-          if (input) {
-            input.focus();
-            const newCaretPosition = atSymbolIndex + formattedReference.length;
-            input.setSelectionRange(newCaretPosition, newCaretPosition);
-          }
-        }, 0);
-      }
-      return;
-    }
+    // Get the input element
+    const inputElement = inputRefs.current.get(mentionMenu.inputId);
+    console.log('Input Element:', inputElement);
+    if (!inputElement) return;
     
-    // Normal handling for form fields
-    // Get the current input
-    const input = inputRefs.current.get(mentionMenu.inputId);
-    if (!input) return;
-    
-    const value = input.value;
-    const caretPosition = input.selectionStart || 0;
-    
-    // Find the last @ symbol before the caret
-    const textBeforeCaret = value.substring(0, caretPosition);
-    const atSymbolIndex = textBeforeCaret.lastIndexOf('@');
+    const value = inputElement.value;
+
+    /*
+     * When the user selects an item with the mouse the focus is temporarily
+     * moved from the original input/textarea to the Command list item.  This
+     * means `selectionStart` is very often `0` which breaks the old logic that
+     * relied on the current caret position to find the preceding "@".
+     *
+     * Instead, just look for the last "@" that appears before the current
+     * search term (what the user typed after the @).  This is robust even when
+     * the input has lost focus.
+     */
+
+    // Position of the last "@" typed by the user. This is robust regardless of
+    // the exact casing the user used for the search term.
+    const atSymbolIndex = value.lastIndexOf("@");
     
     if (atSymbolIndex !== -1) {
-      // For normal input fields, we just insert the field reference text
-      // In a real implementation, you would likely want to track these references
-      // in a structured way rather than just as text
-      
-      // Create a special formatted reference (for visual purposes only in this prototype)
-      // In a real implementation, you would likely use a system to track these references
-      // and render them specially in the form
+      // Create a formatted reference
       const formattedReference = `@${selectedField.label}`;
+      console.log('Formatted Reference:', formattedReference);
       
       // Replace the @searchTerm with the selected field reference
-      const newValue = value.substring(0, atSymbolIndex) + 
-                     formattedReference + 
-                     value.substring(caretPosition);
+      const newValue =
+        value.substring(0, atSymbolIndex) +
+        formattedReference +
+        value.substring(atSymbolIndex + 1 + mentionMenu.searchTerm.length);
+      console.log('New Value:', newValue);
       
-      // Update the field
-      const currentField = fields.find(f => f.id === mentionMenu.inputId);
-      if (currentField) {
+      // Update the real input element immediately so the user sees the
+      // change without waiting for React's re-render.
+      inputElement.value = newValue;
+      
+      // Update the appropriate field/state
+      if (mentionMenu.inputId === 'response_message') {
+        setLinearSettings({...linearSettings, responseMessage: newValue});
+      } else if (mentionMenu.inputId === 'default_title') {
+        setLinearSettings({...linearSettings, defaultTitle: newValue});
+      } else {
+        // For regular form fields, update the placeholder
         updateField(mentionMenu.inputId, { placeholder: newValue });
       }
       
@@ -262,10 +244,10 @@ export function FormBuilder() {
       
       // Set focus back to input and position caret after the inserted mention
       setTimeout(() => {
-        if (input) {
-          input.focus();
+        if (inputElement) {
+          inputElement.focus();
           const newCaretPosition = atSymbolIndex + formattedReference.length;
-          input.setSelectionRange(newCaretPosition, newCaretPosition);
+          inputElement.setSelectionRange(newCaretPosition, newCaretPosition);
         }
       }, 0);
     }
@@ -500,54 +482,25 @@ export function FormBuilder() {
   const renderMentionMenu = () => {
     if (!mentionMenu.isOpen) return null;
     
-    // Filter fields based on search term
-    const filteredFields = fields.filter(field => 
-      field.id !== mentionMenu.inputId && // Don't include the current field
-      field.label.toLowerCase().includes(mentionMenu.searchTerm.toLowerCase())
-    );
-    
-    if (filteredFields.length === 0) return null;
+    console.log('Rendering mention menu:', { mentionMenu, fields });
     
     return (
       <div 
-        className="fixed z-50 rounded-md shadow-lg w-64 overflow-hidden border border-border"
+        className="fixed z-50 w-64 overflow-hidden rounded-md border border-border bg-popover shadow-md"
         style={{
           top: `${mentionMenu.position.top}px`,
           left: `${mentionMenu.position.left}px`,
-          position: 'fixed' // Explicitly set fixed position to override any inheritance
         }}
-        onClick={(e) => e.stopPropagation()} // Prevent clicks from bubbling to the document
+        onClick={(e) => e.stopPropagation()} 
       >
-        <Command className="rounded-lg border shadow-md">
-          <CommandInput 
-            placeholder="Search fields..." 
-            value={mentionMenu.searchTerm}
-            onValueChange={(value) => setMentionMenu({...mentionMenu, searchTerm: value})}
-            className="h-9"
-          />
-          <CommandList>
-            <CommandEmpty>No fields found</CommandEmpty>
-            <CommandGroup>
-              <ScrollArea className="h-[200px]">
-                {filteredFields.map(field => (
-                  <CommandItem
-                    key={field.id}
-                    onSelect={() => handleMentionSelect(field.id)}
-                    className="flex items-center gap-2 px-2"
-                  >
-                    <div className="text-muted-foreground flex-shrink-0">
-                      {getFieldTypeIcon(field.type)}
-                    </div>
-                    <div>
-                      <p className="font-medium">{field.label}</p>
-                      <p className="text-xs text-muted-foreground">{field.type}</p>
-                    </div>
-                  </CommandItem>
-                ))}
-              </ScrollArea>
-            </CommandGroup>
-          </CommandList>
-        </Command>
+        <MentionCombobox
+          fields={fields}
+          inputId={mentionMenu.inputId}
+          searchTerm={mentionMenu.searchTerm}
+          onSearchChange={(value) => setMentionMenu({...mentionMenu, searchTerm: value})}
+          onSelectItem={handleMentionSelect}
+          getFieldTypeIcon={getFieldTypeIcon}
+        />
       </div>
     );
   };
@@ -1036,90 +989,14 @@ export function FormBuilder() {
               <input 
                 type="text" 
                 value={linearSettings.defaultTitle}
-                  onChange={(e) => {
-                    setLinearSettings({...linearSettings, defaultTitle: e.target.value});
-                    
-                    // Handle @ mention detection
-                    const input = e.target;
-                    const value = input.value;
-                    const caretPosition = input.selectionStart || 0;
-                    
-                    // Check if we have an @ symbol before the caret
-                    const textBeforeCaret = value.substring(0, caretPosition);
-                    const atSymbolIndex = textBeforeCaret.lastIndexOf('@');
-                    
-                    if (atSymbolIndex !== -1 && (atSymbolIndex === 0 || textBeforeCaret[atSymbolIndex - 1] === ' ')) {
-                      // We found an @ symbol, get the search term (if any)
-                      const searchTerm = textBeforeCaret.substring(atSymbolIndex + 1).toLowerCase();
-                      
-                      // Get exact position of the @ symbol for better positioning
-                      // This requires creating a temporary span to measure text width
-                      const tempSpan = document.createElement('span');
-                      tempSpan.style.font = window.getComputedStyle(input).font;
-                      tempSpan.style.position = 'absolute';
-                      tempSpan.style.visibility = 'hidden';
-                      tempSpan.textContent = textBeforeCaret.substring(0, atSymbolIndex + 1); // Include the @ symbol
-                      document.body.appendChild(tempSpan);
-                      
-                      const inputRect = input.getBoundingClientRect();
-                      const textWidth = tempSpan.getBoundingClientRect().width;
-                      document.body.removeChild(tempSpan);
-                      
-                      // Calculate the container's position if it exists
-                      const containerRect = formContainerRef.current?.getBoundingClientRect() || { top: 0, left: 0 };
-                      
-                      // Calculate offsets based on input type
-                      const isTextarea = input.tagName.toLowerCase() === 'textarea';
-                      const lineHeight = parseInt(window.getComputedStyle(input).lineHeight) || 20;
-                      
-                      // Count newlines before the caret to calculate vertical offset for textareas
-                      const linesBefore = isTextarea 
-                        ? textBeforeCaret.split('\n').length - 1 
-                        : 0;
-                      
-                      // Get the position of the @ symbol in the current line for textareas
-                      const lastNewlineIndex = isTextarea ? textBeforeCaret.lastIndexOf('\n') : -1;
-                      const textWidthInCurrentLine = isTextarea && lastNewlineIndex !== -1 
-                        ? (() => {
-                            const lineText = textBeforeCaret.substring(lastNewlineIndex + 1, atSymbolIndex + 1);
-                            const lineSpan = document.createElement('span');
-                            lineSpan.style.font = window.getComputedStyle(input).font;
-                            lineSpan.style.position = 'absolute';
-                            lineSpan.style.visibility = 'hidden';
-                            lineSpan.textContent = lineText;
-                            document.body.appendChild(lineSpan);
-                            const width = lineSpan.getBoundingClientRect().width;
-                            document.body.removeChild(lineSpan);
-                            return width;
-                          })()
-                        : textWidth;
-                      
-                      // Position the menu right after the @ symbol - directly using the viewport position
-                      const position = {
-                        top: inputRect.top + (isTextarea ? linesBefore * lineHeight + lineHeight : inputRect.height),
-                        left: inputRect.left + (isTextarea && lastNewlineIndex !== -1 ? textWidthInCurrentLine : textWidth),
-                      };
-                      
-                      setMentionMenu({
-                        isOpen: true,
-                        inputId: 'default_title',
-                        position,
-                        searchTerm,
-                      });
-                    } else {
-                      // Close the menu if there's no @ before the caret
-                      if (mentionMenu.isOpen && mentionMenu.inputId === 'default_title') {
-                        setMentionMenu({ ...mentionMenu, isOpen: false });
-                      }
-                    }
-                  }}
-                  ref={(el) => {
-                    if (el) {
-                      inputRefs.current.set('default_title', el);
-                    } else {
-                      inputRefs.current.delete('default_title');
-                    }
-                  }}
+                onChange={(e) => handleInputChange(e, 'default_title')}
+                ref={(el) => {
+                  if (el) {
+                    inputRefs.current.set('default_title', el);
+                  } else {
+                    inputRefs.current.delete('default_title');
+                  }
+                }}
                 placeholder="Customer Request: {title}"
                 className="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background"
               />
@@ -1201,93 +1078,18 @@ export function FormBuilder() {
                 </div>
               <textarea 
                 value={linearSettings.responseMessage}
-                  onChange={(e) => {
-                    setLinearSettings({...linearSettings, responseMessage: e.target.value});
-                    
-                    // Handle @ mention detection
-                    const input = e.target;
-                    const value = input.value;
-                    const caretPosition = input.selectionStart || 0;
-                    
-                    // Check if we have an @ symbol before the caret
-                    const textBeforeCaret = value.substring(0, caretPosition);
-                    const atSymbolIndex = textBeforeCaret.lastIndexOf('@');
-                    
-                    if (atSymbolIndex !== -1 && (atSymbolIndex === 0 || textBeforeCaret[atSymbolIndex - 1] === ' ')) {
-                      // We found an @ symbol, get the search term (if any)
-                      const searchTerm = textBeforeCaret.substring(atSymbolIndex + 1).toLowerCase();
-                      
-                      // Get exact position of the @ symbol for better positioning
-                      const tempSpan = document.createElement('span');
-                      tempSpan.style.font = window.getComputedStyle(input).font;
-                      tempSpan.style.position = 'absolute';
-                      tempSpan.style.visibility = 'hidden';
-                      tempSpan.textContent = textBeforeCaret.substring(0, atSymbolIndex + 1); // Include the @ symbol
-                      document.body.appendChild(tempSpan);
-                      
-                      const inputRect = input.getBoundingClientRect();
-                      const textWidth = tempSpan.getBoundingClientRect().width;
-                      document.body.removeChild(tempSpan);
-                      
-                      // Calculate the container's position if it exists
-                      const containerRect = formContainerRef.current?.getBoundingClientRect() || { top: 0, left: 0 };
-                      
-                      // Calculate offsets based on input type
-                      const isTextarea = input.tagName.toLowerCase() === 'textarea';
-                      const lineHeight = parseInt(window.getComputedStyle(input).lineHeight) || 20;
-                      
-                      // Count newlines before the caret to calculate vertical offset for textareas
-                      const linesBefore = isTextarea 
-                        ? textBeforeCaret.split('\n').length - 1 
-                        : 0;
-                      
-                      // Get the position of the @ symbol in the current line for textareas
-                      const lastNewlineIndex = isTextarea ? textBeforeCaret.lastIndexOf('\n') : -1;
-                      const textWidthInCurrentLine = isTextarea && lastNewlineIndex !== -1 
-                        ? (() => {
-                            const lineText = textBeforeCaret.substring(lastNewlineIndex + 1, atSymbolIndex + 1);
-                            const lineSpan = document.createElement('span');
-                            lineSpan.style.font = window.getComputedStyle(input).font;
-                            lineSpan.style.position = 'absolute';
-                            lineSpan.style.visibility = 'hidden';
-                            lineSpan.textContent = lineText;
-                            document.body.appendChild(lineSpan);
-                            const width = lineSpan.getBoundingClientRect().width;
-                            document.body.removeChild(lineSpan);
-                            return width;
-                          })()
-                        : textWidth;
-                      
-                      // Position the menu right after the @ symbol - directly using the viewport position
-                      const position = {
-                        top: inputRect.top + (isTextarea ? linesBefore * lineHeight + lineHeight : inputRect.height),
-                        left: inputRect.left + (isTextarea && lastNewlineIndex !== -1 ? textWidthInCurrentLine : textWidth),
-                      };
-                      
-                      setMentionMenu({
-                        isOpen: true,
-                        inputId: 'response_message',
-                        position,
-                        searchTerm,
-                      });
-                    } else {
-                      // Close the menu if there's no @ before the caret
-                      if (mentionMenu.isOpen && mentionMenu.inputId === 'response_message') {
-                        setMentionMenu({ ...mentionMenu, isOpen: false });
-                      }
-                    }
-                  }}
-                  ref={(el) => {
-                    if (el) {
-                      inputRefs.current.set('response_message', el);
-                    } else {
-                      inputRefs.current.delete('response_message');
-                    }
-                  }}
+                onChange={(e) => handleInputChange(e, 'response_message')}
+                ref={(el) => {
+                  if (el) {
+                    inputRefs.current.set('response_message', el);
+                  } else {
+                    inputRefs.current.delete('response_message');
+                  }
+                }}
                 placeholder="Thank you for your feedback!"
-                  rows={5}
-                  className="w-full p-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground" 
-                />
+                rows={5}
+                className="w-full p-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground" 
+              />
                 {linearSettings.responseMessage && linearSettings.responseMessage.includes('@') && (
                   <div className="absolute inset-0 pointer-events-none p-2 pt-10">
                     {highlightMentions(linearSettings.responseMessage)}
@@ -1320,7 +1122,7 @@ export function FormBuilder() {
   const getFieldTypeIcon = (type: FieldType) => {
     switch (type) {
       case "text":
-  return (
+        return (
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5h12M9 3v18m3-6h3"></path>
           </svg>
