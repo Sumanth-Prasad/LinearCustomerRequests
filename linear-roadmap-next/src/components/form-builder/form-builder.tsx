@@ -8,6 +8,28 @@ import PhoneInput from 'react-phone-number-input';
 import type { Country } from 'react-phone-number-input';
 import { getCountries, getCountryCallingCode } from 'react-phone-number-input/input';
 import en from 'react-phone-number-input/locale/en.json';
+import { Mail, AlertCircle, CheckCircle, GripVertical } from 'lucide-react';
+import validator from 'validator';
+import { 
+  DndContext, 
+  closestCenter, 
+  KeyboardSensor, 
+  PointerSensor, 
+  useSensor, 
+  useSensors,
+  DragEndEvent,
+  DragOverlay,
+  DragStartEvent
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { restrictToParentElement } from '@dnd-kit/modifiers';
 
 type FieldType = "text" | "textarea" | "select" | "checkbox" | "radio" | "email" | "phone" | "file" | "image";
 
@@ -44,6 +66,256 @@ interface LinearIntegrationSettings {
   responseMessage: string;
 }
 
+// Field card component to display field content
+function FieldCard({
+  field,
+  isActive,
+  emailValidation,
+  onActive,
+  getFileTypeDescription,
+  highlightMentions
+}: {
+  field: FormField;
+  isActive: boolean;
+  emailValidation: Record<string, { isValid: boolean | null; message: string }>;
+  onActive: (id: string) => void;
+  getFileTypeDescription: (acceptedTypes: string) => string;
+  highlightMentions: (text: string) => React.ReactNode;
+}) {
+  return (
+    <div
+      className={`relative p-3 rounded-md border 
+        ${isActive ? 'border-primary' : 'border-border'}
+        hover:border-primary/30 hover:shadow-sm
+      `}
+      onClick={() => onActive(field.id)}
+    >
+      <label className="block mb-2 font-medium">
+        {field.label}
+        {field.required && <span className="text-red-500 ml-1">*</span>}
+      </label>
+      
+      {field.type === "text" && (
+        <div className="relative">
+          <input 
+            type="text" 
+            placeholder={field.placeholder} 
+            className="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background" 
+            disabled
+          />
+          {field.placeholder && field.placeholder.includes('@') && (
+            <div className="absolute inset-0 pointer-events-none p-2 flex items-center">
+              {highlightMentions(field.placeholder)}
+            </div>
+          )}
+        </div>
+      )}
+      
+      {field.type === "email" && (
+        <div className="relative">
+          <div className="absolute top-0 bottom-0 left-0 pl-3 flex items-center pointer-events-none">
+            <Mail className="h-4 w-4 text-muted-foreground" />
+          </div>
+          <input 
+            type="email" 
+            placeholder={field.placeholder} 
+            className="w-full pl-10 p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background appearance-none" 
+            disabled
+          />
+          {/* Show validation status for preview demonstration */}
+          {emailValidation[field.id] && (
+            <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+              {emailValidation[field.id].isValid ? (
+                <CheckCircle className="h-4 w-4 text-green-500" />
+              ) : (
+                <AlertCircle className="h-4 w-4 text-red-500" />
+              )}
+            </div>
+          )}
+        </div>
+      )}
+      
+      {field.type === "phone" && (
+        <div className="w-full">
+          <PhoneInput
+            international
+            countryCallingCodeEditable={false}
+            defaultCountry={field.countryCode || "US"}
+            placeholder={field.placeholder || "Enter phone number"}
+            value=""
+            onChange={() => {}}
+            disabled
+            className="disabled:opacity-75 bg-background PhoneInputCountry--showFlags"
+          />
+        </div>
+      )}
+      
+      {field.type === "textarea" && (
+        <div className="relative">
+          <textarea 
+            placeholder={field.placeholder} 
+            className="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background" 
+            rows={3}
+            disabled
+          />
+          {field.placeholder && field.placeholder.includes('@') && (
+            <div className="absolute inset-0 pointer-events-none p-2">
+              {highlightMentions(field.placeholder)}
+            </div>
+          )}
+        </div>
+      )}
+      
+      {field.type === "select" && (
+        <select 
+          className="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
+          disabled
+        >
+          <option value="">Select an option</option>
+          {field.options?.map((option, optionIndex) => (
+            <option key={optionIndex} value={option}>{option}</option>
+          ))}
+        </select>
+      )}
+      
+      {field.type === "checkbox" && field.options?.map((option, optionIndex) => (
+        <div key={optionIndex} className="flex items-center mt-2">
+          <input 
+            type="checkbox" 
+            id={`${field.id}_${optionIndex}`} 
+            className="mr-2" 
+            disabled 
+          />
+          <label htmlFor={`${field.id}_${optionIndex}`}>{option}</label>
+        </div>
+      ))}
+      
+      {field.type === "radio" && field.options?.map((option, optionIndex) => (
+        <div key={optionIndex} className="flex items-center mt-2">
+          <input 
+            type="radio" 
+            id={`${field.id}_${optionIndex}`} 
+            name={field.id}
+            className="mr-2" 
+            disabled 
+          />
+          <label htmlFor={`${field.id}_${optionIndex}`}>{option}</label>
+        </div>
+      ))}
+      
+      {field.type === "file" && (
+        <div>
+          <div className="flex items-center justify-center w-full">
+            <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 dark:border-gray-600 dark:bg-gray-700 dark:hover:bg-gray-600">
+              <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                <svg className="w-8 h-8 mb-3 text-gray-500 dark:text-gray-400" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 16">
+                  <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V8m0 0-3 3m3-3 3 3"/>
+                </svg>
+                <p className="mb-1 text-sm text-gray-500 dark:text-gray-400">
+                  <span className="font-semibold">Click to upload</span>{field.multiple ? " files" : ""}
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  {field.acceptedFileTypes ? getFileTypeDescription(field.acceptedFileTypes) : "Any file"}
+                  {field.maxFileSize ? ` (Max: ${field.maxFileSize}MB)` : ""}
+                </p>
+              </div>
+              <input type="file" className="hidden" disabled />
+            </label>
+          </div>
+        </div>
+      )}
+      
+      {field.type === "image" && (
+        <div>
+          <div className="flex items-center justify-center w-full">
+            <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 dark:border-gray-600 dark:bg-gray-700 dark:hover:bg-gray-600">
+              <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                <svg className="w-8 h-8 mb-3 text-gray-500 dark:text-gray-400" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 18">
+                  <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 1v4m0 0 3-3m-3 3L7 2m10 3v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h3M7 8h.01M12 8h.01M7 12h.01M12 12h.01M17 12h.01M17 8h.01"/>
+                </svg>
+                <p className="mb-1 text-sm text-gray-500 dark:text-gray-400">
+                  <span className="font-semibold">Click to upload</span>{field.multiple ? " images" : " an image"}
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  {field.maxFileSize ? `Max: ${field.maxFileSize}MB` : ""}
+                </p>
+              </div>
+              <input type="file" accept="image/*" className="hidden" disabled />
+            </label>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Sortable field component using dnd-kit
+function SortableField({
+  field,
+  activeField,
+  emailValidation,
+  setActiveField,
+  getFileTypeDescription,
+  highlightMentions
+}: {
+  field: FormField;
+  activeField: string | null;
+  emailValidation: Record<string, { isValid: boolean | null; message: string }>;
+  setActiveField: (id: string) => void;
+  getFileTypeDescription: (acceptedTypes: string) => string;
+  highlightMentions: (text: string) => React.ReactNode;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging
+  } = useSortable({ id: field.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0 : 1, // Hide the original item during drag
+    zIndex: isDragging ? 1 : 0
+  };
+
+  return (
+    <div 
+      ref={setNodeRef} 
+      style={style}
+      className="relative"
+    >
+      <div className="relative group">
+        <FieldCard 
+          field={field} 
+          isActive={activeField === field.id}
+          emailValidation={emailValidation}
+          onActive={setActiveField}
+          getFileTypeDescription={getFileTypeDescription}
+          highlightMentions={highlightMentions}
+        />
+        {/* Improved Drag handle */}
+        <div 
+          {...attributes} 
+          {...listeners}
+          className="absolute top-3 right-3 flex items-center justify-center w-8 h-8 rounded-md cursor-grab 
+            active:cursor-grabbing text-muted-foreground hover:text-primary hover:bg-primary/5 
+            transition-colors duration-200 opacity-60 group-hover:opacity-100"
+          title="Drag to reorder"
+        >
+          <div className="grid grid-cols-2 gap-[2px]">
+            {[...Array(6)].map((_, i) => (
+              <div key={i} className="h-[3px] w-[3px] rounded-full bg-current" />
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function FormBuilder() {
   const [fields, setFields] = useState<FormField[]>([
     {
@@ -75,6 +347,9 @@ export function FormBuilder() {
   const [showLinearSettings, setShowLinearSettings] = useState(false);
   const [disableSearchByDefault, setDisableSearchByDefault] = useState(true);
   
+  // State for drag and drop
+  const [activeId, setActiveId] = useState<string | null>(null);
+  
   // State for the @ mention context menu
   const [mentionMenu, setMentionMenu] = useState<MentionMenuState>({
     isOpen: false,
@@ -87,12 +362,69 @@ export function FormBuilder() {
   const inputRefs = useRef<Map<string, HTMLInputElement | HTMLTextAreaElement>>(new Map());
   // Ref for the form container to help with positioning
   const formContainerRef = useRef<HTMLDivElement>(null);
+  // Ref for form fields container
+  const formFieldsRef = useRef<HTMLFormElement>(null);
+
+  // Setup dnd-kit sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 5, // Only activate after dragging 5px
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  // Handle drag start
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveId(event.active.id as string);
+  };
+
+  // Handle drag end and reordering
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    
+    if (over && active.id !== over.id) {
+      setFields((items) => {
+        const oldIndex = items.findIndex(item => item.id === active.id);
+        const newIndex = items.findIndex(item => item.id === over.id);
+        
+        return arrayMove(items, oldIndex, newIndex);
+      });
+    }
+    
+    setActiveId(null);
+  };
+
+  // Find the active field for the drag overlay
+  const activeFieldData = activeId ? fields.find(field => field.id === activeId) : null;
 
   // Default accepted file types
   const defaultFileTypes = {
     file: ".pdf,.doc,.docx,.txt,.zip",
     image: "image/*",
   };
+
+  // State for email validation
+  const [emailValidation, setEmailValidation] = useState<{
+    [key: string]: { isValid: boolean | null; message: string }
+  }>({});
+  
+  // Common email domains for autocomplete suggestions
+  const commonEmailDomains = [
+    'gmail.com',
+    'outlook.com',
+    'hotmail.com',
+    'yahoo.com',
+    'icloud.com',
+    'protonmail.com',
+    'aol.com',
+    'zoho.com',
+    'mail.com',
+    'fastmail.com'
+  ];
 
   // Handle @ mention detection in input/textarea
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>, fieldId: string) => {
@@ -183,6 +515,61 @@ export function FormBuilder() {
     }
   };
   
+  // Email validation handler
+  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>, fieldId: string) => {
+    const value = e.target.value;
+    
+    // Update the field
+    updateField(fieldId, { placeholder: value });
+    
+    // Skip validation if empty
+    if (!value) {
+      setEmailValidation(prev => ({
+        ...prev,
+        [fieldId]: { isValid: null, message: '' }
+      }));
+      return;
+    }
+    
+    // Validate email
+    const isValid = validator.isEmail(value);
+    setEmailValidation(prev => ({
+      ...prev,
+      [fieldId]: {
+        isValid,
+        message: isValid ? 'Valid email format' : 'Invalid email format'
+      }
+    }));
+  };
+  
+  // Function to suggest email domains as user types
+  const getSuggestedEmail = (email: string): string | null => {
+    if (!email || email.includes('@') && email.split('@')[1].includes('.')) {
+      // Already has domain with TLD or is empty
+      return null;
+    }
+    
+    const parts = email.split('@');
+    if (parts.length < 2) {
+      // No @ symbol yet
+      return null;
+    }
+    
+    const username = parts[0];
+    const partialDomain = parts[1].toLowerCase();
+    
+    // Find matching domain
+    const matchingDomain = commonEmailDomains.find(domain => 
+      domain.startsWith(partialDomain)
+    );
+    
+    if (matchingDomain) {
+      return `${username}@${matchingDomain}`;
+    }
+    
+    return null;
+  };
+  
   // Handle selection from the mention menu
   const handleMentionSelect = (selectedFieldId: string) => {
     console.log('Selected Field ID:', selectedFieldId);
@@ -251,74 +638,6 @@ export function FormBuilder() {
       }
     }, 0);
   };
-  
-  // Handle scrolling to keep mention menu positioned correctly
-  useEffect(() => {
-    const updateMentionMenuPosition = () => {
-      if (mentionMenu.isOpen && mentionMenu.inputId) {
-        const input = inputRefs.current.get(mentionMenu.inputId);
-        if (!input) return;
-        
-        const value = input.value;
-        const caretPosition = input.selectionStart || 0;
-        
-        // Find the @ symbol position
-        const textBeforeCaret = value.substring(0, caretPosition);
-        const atSymbolIndex = textBeforeCaret.lastIndexOf('@');
-        
-        if (atSymbolIndex !== -1) {
-          // Recalculate position using the same logic as in handleInputChange
-          const tempSpan = document.createElement('span');
-          tempSpan.style.font = window.getComputedStyle(input).font;
-          tempSpan.style.position = 'absolute';
-          tempSpan.style.visibility = 'hidden';
-          tempSpan.textContent = textBeforeCaret.substring(0, atSymbolIndex + 1);
-          document.body.appendChild(tempSpan);
-          
-          const inputRect = input.getBoundingClientRect();
-          const textWidth = tempSpan.getBoundingClientRect().width;
-          document.body.removeChild(tempSpan);
-          
-          const isTextarea = input.tagName.toLowerCase() === 'textarea';
-          const lineHeight = parseInt(window.getComputedStyle(input).lineHeight) || 20;
-          const linesBefore = isTextarea ? textBeforeCaret.split('\n').length - 1 : 0;
-          
-          const lastNewlineIndex = isTextarea ? textBeforeCaret.lastIndexOf('\n') : -1;
-          const textWidthInCurrentLine = isTextarea && lastNewlineIndex !== -1 
-            ? (() => {
-                const lineText = textBeforeCaret.substring(lastNewlineIndex + 1, atSymbolIndex + 1);
-                const lineSpan = document.createElement('span');
-                lineSpan.style.font = window.getComputedStyle(input).font;
-                lineSpan.style.position = 'absolute';
-                lineSpan.style.visibility = 'hidden';
-                lineSpan.textContent = lineText;
-                document.body.appendChild(lineSpan);
-                const width = lineSpan.getBoundingClientRect().width;
-                document.body.removeChild(lineSpan);
-                return width;
-              })()
-            : textWidth;
-          
-          // Update position
-          setMentionMenu({
-            ...mentionMenu,
-            position: {
-              top: inputRect.top + (isTextarea ? linesBefore * lineHeight + lineHeight : inputRect.height),
-              left: inputRect.left + (isTextarea && lastNewlineIndex !== -1 ? textWidthInCurrentLine : textWidth),
-            }
-          });
-        }
-      }
-    };
-    
-    // Add scroll event listener
-    window.addEventListener('scroll', updateMentionMenuPosition, true);
-    
-    // Clean up
-    return () => {
-      window.removeEventListener('scroll', updateMentionMenuPosition, true);
-    };
-  }, [mentionMenu]);
 
   // Close the mention menu if clicking outside
   useEffect(() => {
@@ -505,158 +824,50 @@ export function FormBuilder() {
   // Render form preview
   const renderFormPreview = () => {
     return (
-      <div className="border border-border p-4 rounded bg-background">
+      <div className="border border-border p-4 rounded bg-background overflow-hidden">
         <h3 className="text-lg font-medium mb-4">Form Preview</h3>
-        <form className="space-y-4">
-          {fields.map(field => (
-            <div 
-              key={field.id} 
-              className={`p-3 rounded-md border ${activeField === field.id ? 'border-primary' : 'border-border'}`}
-              onClick={() => setActiveField(field.id)}
+        <DndContext 
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+          modifiers={[restrictToParentElement]}
+        >
+          <form className="space-y-4" ref={formFieldsRef}>
+            <SortableContext 
+              items={fields.map(field => field.id)} 
+              strategy={verticalListSortingStrategy}
             >
-              <label className="block mb-2 font-medium">
-                {field.label}
-                {field.required && <span className="text-red-500 ml-1">*</span>}
-              </label>
-              
-              {field.type === "text" && (
-                <div className="relative">
-                <input 
-                  type="text" 
-                  placeholder={field.placeholder} 
-                  className="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background" 
-                  disabled
+              {fields.map((field) => (
+                <SortableField
+                  key={field.id}
+                  field={field}
+                  activeField={activeField}
+                  emailValidation={emailValidation}
+                  setActiveField={setActiveField}
+                  getFileTypeDescription={getFileTypeDescription}
+                  highlightMentions={highlightMentions}
                 />
-                  {field.placeholder && field.placeholder.includes('@') && (
-                    <div className="absolute inset-0 pointer-events-none p-2 flex items-center">
-                      {highlightMentions(field.placeholder)}
-                    </div>
-                  )}
-                </div>
-              )}
-              
-              {field.type === "email" && (
-                <input 
-                  type="email" 
-                  placeholder={field.placeholder} 
-                  className="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background" 
-                  disabled
-                />
-              )}
-              
-              {field.type === "phone" && (
-                <div className="w-full">
-                  <PhoneInput
-                    international
-                    countryCallingCodeEditable={false}
-                    defaultCountry={field.countryCode || "US"}
-                    placeholder={field.placeholder || "Enter phone number"}
-                    value=""
-                    onChange={() => {}}
-                    disabled
-                    className="disabled:opacity-75 bg-background PhoneInputCountry--showFlags"
-                  />
-                </div>
-              )}
-              
-              {field.type === "textarea" && (
-                <div className="relative">
-                <textarea 
-                  placeholder={field.placeholder} 
-                  className="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background" 
-                  rows={3}
-                  disabled
-                />
-                  {field.placeholder && field.placeholder.includes('@') && (
-                    <div className="absolute inset-0 pointer-events-none p-2">
-                      {highlightMentions(field.placeholder)}
-                    </div>
-                  )}
-                </div>
-              )}
-              
-              {field.type === "select" && (
-                <select 
-                  className="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
-                  disabled
-                >
-                  <option value="">Select an option</option>
-                  {field.options?.map((option, index) => (
-                    <option key={index} value={option}>{option}</option>
-                  ))}
-                </select>
-              )}
-              
-              {field.type === "checkbox" && field.options?.map((option, index) => (
-                <div key={index} className="flex items-center mt-2">
-                  <input 
-                    type="checkbox" 
-                    id={`${field.id}_${index}`} 
-                    className="mr-2" 
-                    disabled 
-                  />
-                  <label htmlFor={`${field.id}_${index}`}>{option}</label>
-                </div>
               ))}
-              
-              {field.type === "radio" && field.options?.map((option, index) => (
-                <div key={index} className="flex items-center mt-2">
-                  <input 
-                    type="radio" 
-                    id={`${field.id}_${index}`} 
-                    name={field.id}
-                    className="mr-2" 
-                    disabled 
-                  />
-                  <label htmlFor={`${field.id}_${index}`}>{option}</label>
-                </div>
-              ))}
-              
-              {field.type === "file" && (
-                <div>
-                  <div className="flex items-center justify-center w-full">
-                    <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 dark:border-gray-600 dark:bg-gray-700 dark:hover:bg-gray-600">
-                      <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                        <svg className="w-8 h-8 mb-3 text-gray-500 dark:text-gray-400" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 16">
-                          <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V8m0 0-3 3m3-3 3 3"/>
-                        </svg>
-                        <p className="mb-1 text-sm text-gray-500 dark:text-gray-400">
-                          <span className="font-semibold">Click to upload</span>{field.multiple ? " files" : ""}
-                        </p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                          {field.acceptedFileTypes ? getFileTypeDescription(field.acceptedFileTypes) : "Any file"}
-                          {field.maxFileSize ? ` (Max: ${field.maxFileSize}MB)` : ""}
-                        </p>
-                      </div>
-                      <input type="file" className="hidden" disabled />
-                    </label>
-                  </div>
-                </div>
-              )}
-              
-              {field.type === "image" && (
-                <div>
-                  <div className="flex items-center justify-center w-full">
-                    <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 dark:border-gray-600 dark:bg-gray-700 dark:hover:bg-gray-600">
-                      <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                        <svg className="w-8 h-8 mb-3 text-gray-500 dark:text-gray-400" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 18">
-                          <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 1v4m0 0 3-3m-3 3L7 2m10 3v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h3M7 8h.01M12 8h.01M7 12h.01M12 12h.01M17 12h.01M17 8h.01"/>
-                        </svg>
-                        <p className="mb-1 text-sm text-gray-500 dark:text-gray-400">
-                          <span className="font-semibold">Click to upload</span>{field.multiple ? " images" : " an image"}
-                        </p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                          {field.maxFileSize ? `Max: ${field.maxFileSize}MB` : ""}
-                        </p>
-                      </div>
-                      <input type="file" accept="image/*" className="hidden" disabled />
-                    </label>
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
-        </form>
+            </SortableContext>
+          </form>
+          
+          {/* Drag overlay for showing dragged item */}
+          <DragOverlay>
+            {activeFieldData && (
+              <div className="w-full">
+                <FieldCard
+                  field={activeFieldData}
+                  isActive={false}
+                  emailValidation={emailValidation}
+                  onActive={() => {}}
+                  getFileTypeDescription={getFileTypeDescription}
+                  highlightMentions={highlightMentions}
+                />
+              </div>
+            )}
+          </DragOverlay>
+        </DndContext>
       </div>
     );
   };
@@ -690,6 +901,34 @@ export function FormBuilder() {
           {(field.type === "text" || field.type === "email" || field.type === "phone") && (
             <div>
               <label className="block mb-2 font-medium">Placeholder</label>
+              {field.type === "email" ? (
+                <div className="relative">
+                  <div className="absolute top-0 bottom-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Mail className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                  <input 
+                    type="email" 
+                    value={field.placeholder || ""} 
+                    onChange={(e) => handleEmailChange(e, field.id)}
+                    ref={(el) => {
+                      if (el) {
+                        inputRefs.current.set(field.id, el);
+                      } else {
+                        inputRefs.current.delete(field.id);
+                      }
+                    }}
+                    list={`domains-${field.id}`}
+                    className={`w-full pl-10 p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-background appearance-none ${
+                      emailValidation[field.id]?.isValid === false 
+                        ? 'border-red-500 focus:border-red-500 focus:ring-red-500/50' 
+                        : emailValidation[field.id]?.isValid === true
+                          ? 'border-green-500 focus:border-green-500 focus:ring-green-500/50'
+                          : 'focus:border-primary border-border'
+                    }`}
+                  />
+                </div>
+              ) : (
+                <>
               <input 
                 type="text" 
                 value={field.placeholder || ""} 
@@ -704,6 +943,8 @@ export function FormBuilder() {
                 className="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background"
               />
               <p className="text-xs text-muted-foreground mt-1">Type @ to reference other fields</p>
+                </>
+              )}
             </div>
           )}
           
@@ -750,7 +991,7 @@ export function FormBuilder() {
                   return (
                     <option key={country} value={country}>
                       {flagEmoji} {countryName} (+{callingCode})
-                    </option>
+                  </option>
                   );
                 })}
               </select>
@@ -1321,7 +1562,7 @@ export function FormBuilder() {
       </div>
       
       <div className="mt-6">
-        {renderLinearSettings()}
+      {renderLinearSettings()}
       </div>
       
       {/* Render the mention menu */}
