@@ -98,43 +98,87 @@ export function MentionCombobox({
     <div
       ref={commandRef}
       tabIndex={0}
-      className="outline-none focus:outline-none w-full"
+      className="outline-none focus:outline-none w-full bg-popover text-popover-foreground"
       onKeyDown={handleKeyDown}
     >
-      <Command shouldFilter={false} className="overflow-visible">
+      <Command shouldFilter={false} className="overflow-visible bg-popover border-none rounded-md">
         <CommandInput 
           placeholder="Search fields..." 
           value={searchTerm}
           onValueChange={onSearchChange}
           autoFocus={!disableSearchByDefault}
-          className="border-none focus:ring-0 outline-none"
+          className="border-none focus:ring-0 outline-none text-popover-foreground bg-transparent font-medium"
         />
-        <CommandList>
+        <CommandList className="bg-popover border-t border-border max-h-[200px]">
           {filteredFields.length === 0 && (
-            <CommandEmpty>No fields found</CommandEmpty>
+            <CommandEmpty className="text-popover-foreground py-6 text-sm text-center">No fields found</CommandEmpty>
           )}
           {filteredFields.length > 0 && (
-            <CommandGroup>
-              <ScrollArea className="h-[200px]">
-                {filteredFields.map((field, index) => (
-                  <CommandItem
-                    key={field.id}
-                    value={field.id}
-                    onSelect={() => onSelectItem(field.id)}
-                    className={cn(
-                      "cursor-pointer transition-colors",
-                      focusedIndex === index ? "bg-accent text-accent-foreground" : ""
-                    )}
-                    onMouseEnter={() => setFocusedIndex(index)}
-                  >
-                    <span className="mr-2 text-muted-foreground">
-                      {getFieldTypeIcon(field.type)}
-                    </span>
-                    <span>{field.label}</span>
-                    <span className="ml-auto text-xs text-muted-foreground">{field.type}</span>
-                  </CommandItem>
-                ))}
-              </ScrollArea>
+            <CommandGroup className="bg-popover p-1">
+              {/* Only use ScrollArea if we have more than 5 items */}
+              {filteredFields.length <= 5 ? (
+                <>
+                  {filteredFields.map((field, index) => (
+                    <CommandItem
+                      key={field.id}
+                      value={field.id}
+                      onSelect={() => onSelectItem(field.id)}
+                      className={cn(
+                        "cursor-pointer transition-colors text-popover-foreground hover:bg-accent hover:text-accent-foreground my-1 px-2 py-2 rounded-md",
+                        focusedIndex === index 
+                          ? "bg-primary text-primary-foreground shadow-sm border-l-4 border-primary" 
+                          : ""
+                      )}
+                      onMouseEnter={() => setFocusedIndex(index)}
+                    >
+                      <span className={cn(
+                        "mr-2",
+                        focusedIndex === index ? "text-primary-foreground" : "text-muted-foreground"
+                      )}>
+                        {getFieldTypeIcon(field.type)}
+                      </span>
+                      <span>{field.label}</span>
+                      <span className={cn(
+                        "ml-auto text-xs",
+                        focusedIndex === index ? "text-primary-foreground" : "text-muted-foreground"
+                      )}>
+                        {field.type}
+                      </span>
+                    </CommandItem>
+                  ))}
+                </>
+              ) : (
+                <ScrollArea className="h-[200px] bg-popover">
+                  {filteredFields.map((field, index) => (
+                    <CommandItem
+                      key={field.id}
+                      value={field.id}
+                      onSelect={() => onSelectItem(field.id)}
+                      className={cn(
+                        "cursor-pointer transition-colors text-popover-foreground hover:bg-accent hover:text-accent-foreground my-1 px-2 py-2 rounded-md",
+                        focusedIndex === index 
+                          ? "bg-primary text-primary-foreground shadow-sm border-l-4 border-primary" 
+                          : ""
+                      )}
+                      onMouseEnter={() => setFocusedIndex(index)}
+                    >
+                      <span className={cn(
+                        "mr-2",
+                        focusedIndex === index ? "text-primary-foreground" : "text-muted-foreground"
+                      )}>
+                        {getFieldTypeIcon(field.type)}
+                      </span>
+                      <span>{field.label}</span>
+                      <span className={cn(
+                        "ml-auto text-xs",
+                        focusedIndex === index ? "text-primary-foreground" : "text-muted-foreground"
+                      )}>
+                        {field.type}
+                      </span>
+                    </CommandItem>
+                  ))}
+                </ScrollArea>
+              )}
             </CommandGroup>
           )}
         </CommandList>

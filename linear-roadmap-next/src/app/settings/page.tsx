@@ -31,7 +31,7 @@ export default function SettingsPage() {
           </div>
 
           <div className="w-full max-w-[1440px] mx-auto px-2 mt-2">
-            <div className="bg-white dark:bg-card rounded-lg shadow-md p-3 md:p-5 border border-sidebar-accent">
+            <div className="bg-background rounded-lg shadow-md p-3 md:p-5 border border-border">
               {activeSection === "form" && (
                 <section id="form-section" className="w-full">
                   <h2 className="text-lg font-semibold mb-2">Feature Request Form Builder</h2>

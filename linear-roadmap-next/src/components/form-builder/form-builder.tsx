@@ -206,15 +206,15 @@ function FieldCard({
       {field.type === "file" && (
         <div>
           <div className="flex items-center justify-center w-full">
-            <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 dark:border-gray-600 dark:bg-gray-700 dark:hover:bg-gray-600">
+            <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed rounded-lg cursor-pointer bg-muted hover:bg-muted/80 dark:border-muted dark:bg-background dark:hover:bg-muted/30">
               <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                <svg className="w-8 h-8 mb-3 text-gray-500 dark:text-gray-400" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 16">
+                <svg className="w-8 h-8 mb-3 text-muted-foreground" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 16">
                   <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V8m0 0-3 3m3-3 3 3"/>
                 </svg>
-                <p className="mb-1 text-sm text-gray-500 dark:text-gray-400">
+                <p className="mb-1 text-sm text-foreground">
                   <span className="font-semibold">Click to upload</span>{field.multiple ? " files" : ""}
                 </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
+                <p className="text-xs text-muted-foreground">
                   {field.acceptedFileTypes ? getFileTypeDescription(field.acceptedFileTypes) : "Any file"}
                   {field.maxFileSize ? ` (Max: ${field.maxFileSize}MB)` : ""}
                 </p>
@@ -228,15 +228,15 @@ function FieldCard({
       {field.type === "image" && (
         <div>
           <div className="flex items-center justify-center w-full">
-            <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100 dark:border-gray-600 dark:bg-gray-700 dark:hover:bg-gray-600">
+            <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer bg-muted hover:bg-muted/80 dark:border-muted dark:bg-background dark:hover:bg-muted/30">
               <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                <svg className="w-8 h-8 mb-3 text-gray-500 dark:text-gray-400" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 18">
+                <svg className="w-8 h-8 mb-3 text-muted-foreground" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 18">
                   <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 1v4m0 0 3-3m-3 3L7 2m10 3v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h3M7 8h.01M12 8h.01M7 12h.01M12 12h.01M17 12h.01M17 8h.01"/>
                 </svg>
-                <p className="mb-1 text-sm text-gray-500 dark:text-gray-400">
+                <p className="mb-1 text-sm text-foreground">
                   <span className="font-semibold">Click to upload</span>{field.multiple ? " images" : " an image"}
                 </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
+                <p className="text-xs text-muted-foreground">
                   {field.maxFileSize ? `Max: ${field.maxFileSize}MB` : ""}
                 </p>
               </div>
@@ -802,21 +802,25 @@ export function FormBuilder() {
     
     return (
       <div 
-        className="fixed z-50 w-64 overflow-hidden rounded-md border border-border bg-popover shadow-md mention-dropdown"
+        className="fixed z-50 w-64 overflow-hidden rounded-md border border-border shadow-md mention-dropdown"
         style={{
           top: `${mentionMenu.position.top}px`,
           left: `${mentionMenu.position.left}px`,
+          backgroundColor: 'var(--popover)',
+          color: 'var(--popover-foreground)',
         }}
       >
-        <MentionCombobox
-          fields={fields}
-          inputId={mentionMenu.inputId}
-          searchTerm={mentionMenu.searchTerm}
-          onSearchChange={(value) => setMentionMenu({...mentionMenu, searchTerm: value})}
-          onSelectItem={handleMentionSelect}
-          getFieldTypeIcon={getFieldTypeIcon}
-          disableSearchByDefault={disableSearchByDefault}
-        />
+        <div style={{ backgroundColor: 'var(--popover)' }}>
+          <MentionCombobox
+            fields={fields}
+            inputId={mentionMenu.inputId}
+            searchTerm={mentionMenu.searchTerm}
+            onSearchChange={(value) => setMentionMenu({...mentionMenu, searchTerm: value})}
+            onSelectItem={handleMentionSelect}
+            getFieldTypeIcon={getFieldTypeIcon}
+            disableSearchByDefault={disableSearchByDefault}
+          />
+        </div>
       </div>
     );
   };
@@ -864,8 +868,8 @@ export function FormBuilder() {
                   getFileTypeDescription={getFileTypeDescription}
                   highlightMentions={highlightMentions}
                 />
-              </div>
-            )}
+                </div>
+              )}
           </DragOverlay>
         </DndContext>
       </div>
@@ -1256,11 +1260,11 @@ export function FormBuilder() {
             <div>
               <label className="block mb-2 font-medium">Response Message</label>
               <div className="relative border rounded-md overflow-hidden border-border">
-                <div className="flex gap-1 border-b border-border bg-gray-50 dark:bg-gray-800 p-1">
+                <div className="flex gap-1 border-b border-border bg-muted dark:bg-background p-1">
                   <button 
                     type="button"
                     onClick={() => insertMarkdown('**')}
-                    className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200" 
+                    className="p-1 rounded hover:bg-accent hover:text-accent-foreground text-foreground" 
                     title="Bold"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1270,18 +1274,18 @@ export function FormBuilder() {
                   <button 
                     type="button"
                     onClick={() => insertMarkdown('*')}
-                    className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200" 
+                    className="p-1 rounded hover:bg-accent hover:text-accent-foreground text-foreground" 
                     title="Italic"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 4.5h3m4 0h-3m-4 15h3m4 0h-3m-7-7.5L14 4.5m0 15L7 12"></path>
                     </svg>
                   </button>
-                  <div className="h-full w-px bg-gray-300 dark:bg-gray-600 mx-1"></div>
+                  <div className="h-full w-px bg-border mx-1"></div>
                   <button 
                     type="button"
                     onClick={() => insertMarkdown('- ')}
-                    className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200" 
+                    className="p-1 rounded hover:bg-accent hover:text-accent-foreground text-foreground" 
                     title="Bulleted List"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1291,18 +1295,18 @@ export function FormBuilder() {
                   <button 
                     type="button"
                     onClick={() => insertMarkdown('1. ')}
-                    className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200" 
+                    className="p-1 rounded hover:bg-accent hover:text-accent-foreground text-foreground" 
                     title="Numbered List"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 12.5h10.5m-10.5-6h10.5m-10.5 12h10.5M3 18.5v-3l-1 1v-1l1-1v-3m2 1v-1l-2 2v-1l2-2v-1m0-2v-1l-2 2v-1l2-2v-1"></path>
                     </svg>
                   </button>
-                  <div className="h-full w-px bg-gray-300 dark:bg-gray-600 mx-1"></div>
+                  <div className="h-full w-px bg-border mx-1"></div>
                   <button 
                     type="button"
                     onClick={() => insertMarkdown('[](url)')}
-                    className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200" 
+                    className="p-1 rounded hover:bg-accent hover:text-accent-foreground text-foreground" 
                     title="Link"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1312,7 +1316,7 @@ export function FormBuilder() {
                   <button 
                     type="button"
                     onClick={() => insertMarkdown('# ')}
-                    className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200" 
+                    className="p-1 rounded hover:bg-accent hover:text-accent-foreground text-foreground" 
                     title="Heading"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1519,7 +1523,7 @@ export function FormBuilder() {
   };
 
   return (
-    <div className="relative" ref={formContainerRef}>
+    <div className="relative bg-background text-foreground" ref={formContainerRef}>
       <div className="flex justify-between mb-6">
         <div className="flex items-center">
           <select 
