@@ -4,6 +4,10 @@ import React, { useState, useRef, useEffect } from "react";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { MentionCombobox } from "@/components/ui/mention-combobox";
+import PhoneInput from 'react-phone-number-input';
+import type { Country } from 'react-phone-number-input';
+import { getCountries, getCountryCallingCode } from 'react-phone-number-input/input';
+import en from 'react-phone-number-input/locale/en.json';
 
 type FieldType = "text" | "textarea" | "select" | "checkbox" | "radio" | "email" | "phone" | "file" | "image";
 
@@ -14,7 +18,7 @@ interface FormField {
   placeholder?: string;
   required: boolean;
   options?: string[]; // For select, checkbox, radio
-  countryCode?: string; // For phone fields
+  countryCode?: Country; // For phone fields (ISO country code)
   acceptedFileTypes?: string; // For file/image fields (e.g., ".pdf,.docx" or "image/*")
   multiple?: boolean; // For file/image fields
   maxFileSize?: number; // In MB
@@ -84,19 +88,11 @@ export function FormBuilder() {
   // Ref for the form container to help with positioning
   const formContainerRef = useRef<HTMLDivElement>(null);
 
-  // Country codes for phone field
-  const countryCodes = [
-    { code: "+1", flag: "🇺🇸", name: "United States" },
-    { code: "+44", flag: "🇬🇧", name: "United Kingdom" },
-    { code: "+61", flag: "🇦🇺", name: "Australia" },
-    { code: "+91", flag: "🇮🇳", name: "India" },
-    { code: "+86", flag: "🇨🇳", name: "China" },
-    { code: "+49", flag: "🇩🇪", name: "Germany" },
-    { code: "+33", flag: "🇫🇷", name: "France" },
-    { code: "+81", flag: "🇯🇵", name: "Japan" },
-    { code: "+55", flag: "🇧🇷", name: "Brazil" },
-    { code: "+7", flag: "🇷🇺", name: "Russia" },
-  ];
+  // Default accepted file types
+  const defaultFileTypes = {
+    file: ".pdf,.doc,.docx,.txt,.zip",
+    image: "image/*",
+  };
 
   // Handle @ mention detection in input/textarea
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>, fieldId: string) => {
@@ -342,12 +338,6 @@ export function FormBuilder() {
     };
   }, [mentionMenu]);
 
-  // Default accepted file types
-  const defaultFileTypes = {
-    file: ".pdf,.doc,.docx,.txt,.zip",
-    image: "image/*",
-  };
-
   // Add a new field
   const addField = () => {
     const newField: FormField = {
@@ -359,7 +349,7 @@ export function FormBuilder() {
       options: newFieldType === "select" || newFieldType === "radio" || newFieldType === "checkbox" 
         ? ["Option 1", "Option 2"] 
         : undefined,
-      countryCode: newFieldType === "phone" ? "+1" : undefined,
+      countryCode: newFieldType === "phone" ? "US" : undefined,
       acceptedFileTypes: newFieldType === "file" ? defaultFileTypes.file : 
                         newFieldType === "image" ? defaultFileTypes.image : undefined,
       multiple: newFieldType === "file" || newFieldType === "image" ? false : undefined,
@@ -555,24 +545,16 @@ export function FormBuilder() {
               )}
               
               {field.type === "phone" && (
-                <div className="flex">
-                  <div className="w-24 flex-shrink-0">
-                    <select 
-                      className="w-full p-2 border rounded-l-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground" 
-                      disabled
-                    >
-                      {countryCodes.map(country => (
-                        <option key={country.code} value={country.code}>
-                          {country.flag} {country.code}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <input 
-                    type="tel" 
-                    placeholder={field.placeholder} 
-                    className="flex-1 p-2 border border-l-0 rounded-r-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background" 
+                <div className="w-full">
+                  <PhoneInput
+                    international
+                    countryCallingCodeEditable={false}
+                    defaultCountry={field.countryCode || "US"}
+                    placeholder={field.placeholder || "Enter phone number"}
+                    value=""
+                    onChange={() => {}}
                     disabled
+                    className="disabled:opacity-75 bg-background PhoneInputCountry--showFlags"
                   />
                 </div>
               )}
@@ -747,18 +729,32 @@ export function FormBuilder() {
           
           {field.type === "phone" && (
             <div>
-              <label className="block mb-2 font-medium">Default Country Code</label>
+              <label className="block mb-2 font-medium">Default Country</label>
               <select 
-                value={field.countryCode || "+1"}
-                onChange={(e) => updateField(field.id, { countryCode: e.target.value })}
+                value={field.countryCode || "US"}
+                onChange={(e) => updateField(field.id, { countryCode: e.target.value as any })}
                 className="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
               >
-                {countryCodes.map(country => (
-                  <option key={country.code} value={country.code}>
-                    {country.flag} {country.code} - {country.name}
-                  </option>
-                ))}
+                {getCountries().sort((a, b) => {
+                  const nameA = en[a] || a;
+                  const nameB = en[b] || b;
+                  return nameA.localeCompare(nameB);
+                }).map((country) => {
+                  // For each country code, convert to flag emoji 
+                  const codePoints = [...country.toUpperCase()].map(
+                    char => char.charCodeAt(0) + 127397
+                  );
+                  const flagEmoji = String.fromCodePoint(...codePoints);
+                  const countryName = en[country] || country;
+                  const callingCode = getCountryCallingCode(country);
+                  return (
+                    <option key={country} value={country}>
+                      {flagEmoji} {countryName} (+{callingCode})
+                    </option>
+                  );
+                })}
               </select>
+              <p className="text-xs text-muted-foreground mt-1">This sets the default country in the phone input.</p>
             </div>
           )}
           

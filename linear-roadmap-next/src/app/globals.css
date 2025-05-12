@@ -1,5 +1,23 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "react-phone-number-input/style.css";
+
+/* Ensure phone input flags are displayed clearly */
+.PhoneInputCountryIcon {
+  width: 2em !important;
+  height: 1.5em !important;
+  border-radius: 3px;
+  overflow: hidden;
+  margin-right: 0.7em !important;
+}
+
+.PhoneInputCountrySelectArrow {
+  margin-right: 0.7em !important;
+}
+
+.PhoneInputCountrySelect:focus + .PhoneInputCountryIcon + .PhoneInputCountrySelectArrow {
+  opacity: 1;
+}
 
 @custom-variant dark (&:is(.dark *));
 
