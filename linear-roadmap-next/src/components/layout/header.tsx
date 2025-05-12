@@ -3,11 +3,43 @@
 import Link from "next/link";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { AuthSection } from "@/components/auth/auth-section";
+import { useTheme } from "next-themes";
+import { useEffect, useState } from "react";
 
 export function Header() {
+  const { theme } = useTheme();
+  const [bgColor, setBgColor] = useState("white");
+  const [mounted, setMounted] = useState(false);
+  
+  // Update background color based on theme
+  useEffect(() => {
+    setMounted(true);
+    setBgColor(theme === "dark" ? "#1e1e1e" : "white");
+  }, [theme]);
+  
+  // Don't render with SSR since we don't know the theme yet
+  if (!mounted) {
+    return (
+      <header 
+        className="border-b sticky top-0 z-[100] shadow-md"
+        style={{ backgroundColor: "white" }}
+      >
+        <div className="container mx-auto flex h-14 items-center justify-between px-4 sm:px-6">
+          {/* Content */}
+        </div>
+      </header>
+    );
+  }
+
   return (
-    <header className="border-b bg-card sticky top-0 z-50 shadow-sm">
-      <div className="container mx-auto flex h-14 items-center justify-between px-4 sm:px-6">
+    <header 
+      className="border-b sticky top-0 z-[100] shadow-md"
+      style={{ backgroundColor: bgColor }}
+    >
+      <div 
+        className="container mx-auto flex h-14 items-center justify-between px-4 sm:px-6"
+        style={{ backgroundColor: bgColor }}
+      >
         <Link href="/" className="flex items-center gap-2">
           <span className="text-lg font-bold">Linear Roadmap</span>
         </Link>

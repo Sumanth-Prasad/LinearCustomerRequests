@@ -576,6 +576,65 @@ export function FormBuilder() {
     
     if (!mentionMenu.inputId) return;
     
+    // Handle special utility items
+    if (selectedFieldId === 'current_date') {
+      const inputElement = inputRefs.current.get(mentionMenu.inputId);
+      if (!inputElement) return;
+      
+      // Store active inputId before clearing mentionMenu
+      const currentInputId = mentionMenu.inputId; 
+      const currentSearchTerm = mentionMenu.searchTerm;
+
+      // Immediately close dropdown and clear state
+      setMentionMenu({
+        isOpen: false,
+        inputId: null,
+        position: { top: 0, left: 0 },
+        searchTerm: ""
+      });
+      
+      // Insert current date
+      setTimeout(() => {
+        const value = inputElement.value;
+        
+        // Position of the last "@" typed by the user
+        const atSymbolIndex = value.lastIndexOf("@");
+        
+        if (atSymbolIndex !== -1) {
+          // Format current date - customize as needed
+          const today = new Date();
+          const formattedDate = today.toLocaleDateString();
+          const dateRef = `«Date: ${formattedDate}» `;
+          
+          // Replace the @searchTerm with the date reference
+          const newValue =
+            value.substring(0, atSymbolIndex) +
+            dateRef +
+            value.substring(atSymbolIndex + 1 + currentSearchTerm.length);
+          
+          // Directly set input value
+          inputElement.value = newValue;
+          
+          // Set focus and correct caret position
+          inputElement.focus();
+          const newCaretPosition = atSymbolIndex + dateRef.length;
+          inputElement.setSelectionRange(newCaretPosition, newCaretPosition);
+          
+          // Update state after DOM is updated
+          if (currentInputId === 'response_message') {
+            setLinearSettings({...linearSettings, responseMessage: newValue});
+          } else if (currentInputId === 'default_title') {
+            setLinearSettings({...linearSettings, defaultTitle: newValue});
+          } else {
+            // For regular form fields, update the placeholder
+            updateField(currentInputId, { placeholder: newValue });
+          }
+        }
+      }, 0);
+      
+      return;
+    }
+    
     // Get the selected field label
     const selectedField = fields.find(f => f.id === selectedFieldId);
     console.log('Selected Field:', selectedField);
