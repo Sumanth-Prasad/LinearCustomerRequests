@@ -1048,7 +1048,7 @@ export function FormBuilder() {
                     title="Bulleted List"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"></path>
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 6h13M8 12h13M8 18h7"></path>
                     </svg>
                   </button>
                   <button 
@@ -1315,17 +1315,18 @@ export function FormBuilder() {
         </button>
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+        <div className="lg:col-span-7">
           {renderFormPreview()}
         </div>
-        <div>
+        <div className="lg:col-span-5">
           {renderFieldEditor()}
         </div>
       </div>
       
-      {/* Linear Integration Settings */}
-      {renderLinearSettings()}
+      <div className="mt-6">
+        {renderLinearSettings()}
+      </div>
       
       {/* Render the mention menu */}
       {renderMentionMenu()}

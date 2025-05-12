@@ -7,7 +7,7 @@ import { AuthSection } from "@/components/auth/auth-section";
 export function Header() {
   return (
     <header className="border-b bg-card sticky top-0 z-50 shadow-sm">
-      <div className="container mx-auto flex h-16 items-center justify-between px-4 sm:px-6">
+      <div className="container mx-auto flex h-14 items-center justify-between px-4 sm:px-6">
         <Link href="/" className="flex items-center gap-2">
           <span className="text-lg font-bold">Linear Roadmap</span>
         </Link>
