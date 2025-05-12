@@ -69,6 +69,7 @@ export function FormBuilder() {
   const [activeField, setActiveField] = useState<string | null>(null);
   const [newFieldType, setNewFieldType] = useState<FieldType>("text");
   const [showLinearSettings, setShowLinearSettings] = useState(false);
+  const [disableSearchByDefault, setDisableSearchByDefault] = useState(true);
   
   // State for the @ mention context menu
   const [mentionMenu, setMentionMenu] = useState<MentionMenuState>({
@@ -107,7 +108,12 @@ export function FormBuilder() {
     const textBeforeCaret = value.substring(0, caretPosition);
     const atSymbolIndex = textBeforeCaret.lastIndexOf('@');
     
-    if (atSymbolIndex !== -1 && (atSymbolIndex === 0 || textBeforeCaret[atSymbolIndex - 1] === ' ')) {
+    // Ignore @ within input if it's followed by a bracket - it's already a mention
+    const isInsideMention = atSymbolIndex > 0 && 
+      textBeforeCaret.substring(atSymbolIndex).match(/^\@«[^«»]+»/);
+    
+    if (atSymbolIndex !== -1 && !isInsideMention && 
+       (atSymbolIndex === 0 || textBeforeCaret[atSymbolIndex - 1] === ' ')) {
       // We found an @ symbol, get the search term (if any)
       const searchTerm = textBeforeCaret.substring(atSymbolIndex + 1).toLowerCase();
       
@@ -184,6 +190,7 @@ export function FormBuilder() {
   // Handle selection from the mention menu
   const handleMentionSelect = (selectedFieldId: string) => {
     console.log('Selected Field ID:', selectedFieldId);
+    
     if (!mentionMenu.inputId) return;
     
     // Get the selected field label
@@ -196,61 +203,57 @@ export function FormBuilder() {
     console.log('Input Element:', inputElement);
     if (!inputElement) return;
     
-    const value = inputElement.value;
+    // Store active inputId before clearing mentionMenu
+    const currentInputId = mentionMenu.inputId; 
+    const currentSearchTerm = mentionMenu.searchTerm;
 
-    /*
-     * When the user selects an item with the mouse the focus is temporarily
-     * moved from the original input/textarea to the Command list item.  This
-     * means `selectionStart` is very often `0` which breaks the old logic that
-     * relied on the current caret position to find the preceding "@".
-     *
-     * Instead, just look for the last "@" that appears before the current
-     * search term (what the user typed after the @).  This is robust even when
-     * the input has lost focus.
-     */
-
-    // Position of the last "@" typed by the user. This is robust regardless of
-    // the exact casing the user used for the search term.
-    const atSymbolIndex = value.lastIndexOf("@");
+    // Immediately close dropdown and clear all state to prevent 
+    // any backspace or keyboard events going to search
+    setMentionMenu({
+      isOpen: false,
+      inputId: null,
+      position: { top: 0, left: 0 },
+      searchTerm: ""
+    });
     
-    if (atSymbolIndex !== -1) {
-      // Create a formatted reference
-      const formattedReference = `@${selectedField.label}`;
-      console.log('Formatted Reference:', formattedReference);
+    // After menu is completely closed, modify input
+    setTimeout(() => {
+      const value = inputElement.value;
       
-      // Replace the @searchTerm with the selected field reference
-      const newValue =
-        value.substring(0, atSymbolIndex) +
-        formattedReference +
-        value.substring(atSymbolIndex + 1 + mentionMenu.searchTerm.length);
-      console.log('New Value:', newValue);
+      // Position of the last "@" typed by the user
+      const atSymbolIndex = value.lastIndexOf("@");
       
-      // Update the real input element immediately so the user sees the
-      // change without waiting for React's re-render.
-      inputElement.value = newValue;
-      
-      // Update the appropriate field/state
-      if (mentionMenu.inputId === 'response_message') {
-        setLinearSettings({...linearSettings, responseMessage: newValue});
-      } else if (mentionMenu.inputId === 'default_title') {
-        setLinearSettings({...linearSettings, defaultTitle: newValue});
-      } else {
-        // For regular form fields, update the placeholder
-        updateField(mentionMenu.inputId, { placeholder: newValue });
-      }
-      
-      // Close the menu
-      setMentionMenu({ ...mentionMenu, isOpen: false });
-      
-      // Set focus back to input and position caret after the inserted mention
-      setTimeout(() => {
-        if (inputElement) {
-          inputElement.focus();
-          const newCaretPosition = atSymbolIndex + formattedReference.length;
-          inputElement.setSelectionRange(newCaretPosition, newCaretPosition);
+      if (atSymbolIndex !== -1) {
+        // Create a formatted reference with distinct syntax that won't trigger the menu again
+        const formattedReference = `«${selectedField.label}» `;
+        console.log('Formatted Reference:', formattedReference);
+        
+        // Replace the @searchTerm with the selected field reference
+        const newValue =
+          value.substring(0, atSymbolIndex) +
+          formattedReference +
+          value.substring(atSymbolIndex + 1 + currentSearchTerm.length);
+        console.log('New Value:', newValue);
+        
+        // Directly set input value
+        inputElement.value = newValue;
+        
+        // Set focus and correct caret position
+        inputElement.focus();
+        const newCaretPosition = atSymbolIndex + formattedReference.length;
+        inputElement.setSelectionRange(newCaretPosition, newCaretPosition);
+        
+        // Update state after DOM is updated
+        if (currentInputId === 'response_message') {
+          setLinearSettings({...linearSettings, responseMessage: newValue});
+        } else if (currentInputId === 'default_title') {
+          setLinearSettings({...linearSettings, defaultTitle: newValue});
+        } else {
+          // For regular form fields, update the placeholder
+          updateField(currentInputId, { placeholder: newValue });
         }
-      }, 0);
-    }
+      }
+    }, 0);
   };
   
   // Handle scrolling to keep mention menu positioned correctly
@@ -325,7 +328,11 @@ export function FormBuilder() {
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (mentionMenu.isOpen) {
-        setMentionMenu({ ...mentionMenu, isOpen: false });
+        // Check if click is outside the mention menu
+        const mentionMenuElement = document.querySelector('.mention-dropdown');
+        if (mentionMenuElement && !mentionMenuElement.contains(e.target as Node)) {
+          setMentionMenu({ ...mentionMenu, isOpen: false });
+        }
       }
     };
     
@@ -463,14 +470,14 @@ export function FormBuilder() {
   const highlightMentions = (text: string) => {
     if (!text) return null;
     
-    // Simple regex to find @mentions
-    const parts = text.split(/(@[A-Za-z0-9\s]+)/g);
+    // Updated regex to find our mention format: «Label»
+    const parts = text.split(/(«[^«»]+»)/g);
     
     return parts.map((part, index) => {
-      if (part.startsWith('@')) {
+      if (part.startsWith('«') && part.endsWith('»')) {
         return (
-          <span key={index} className="bg-blue-100 text-blue-800 px-1 rounded-sm font-medium">
-            {part}
+          <span key={index} className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded font-medium">
+            @{part.slice(1, -1)}
           </span>
         );
       }
@@ -486,12 +493,11 @@ export function FormBuilder() {
     
     return (
       <div 
-        className="fixed z-50 w-64 overflow-hidden rounded-md border border-border bg-popover shadow-md"
+        className="fixed z-50 w-64 overflow-hidden rounded-md border border-border bg-popover shadow-md mention-dropdown"
         style={{
           top: `${mentionMenu.position.top}px`,
           left: `${mentionMenu.position.left}px`,
         }}
-        onClick={(e) => e.stopPropagation()} 
       >
         <MentionCombobox
           fields={fields}
@@ -500,6 +506,7 @@ export function FormBuilder() {
           onSearchChange={(value) => setMentionMenu({...mentionMenu, searchTerm: value})}
           onSelectItem={handleMentionSelect}
           getFieldTypeIcon={getFieldTypeIcon}
+          disableSearchByDefault={disableSearchByDefault}
         />
       </div>
     );
@@ -1111,6 +1118,36 @@ export function FormBuilder() {
                 className="mr-2" 
               />
               <label htmlFor="includeCustomerInfo">Include customer contact information (if provided)</label>
+            </div>
+            
+            <div className="flex items-center">
+              <input 
+                type="checkbox" 
+                id="disableSearchByDefault" 
+                checked={disableSearchByDefault} 
+                onChange={(e) => setDisableSearchByDefault(e.target.checked)}
+                className="mr-2" 
+              />
+              <label htmlFor="disableSearchByDefault">Disable search box focus by default in field references</label>
+              <div className="ml-2 text-muted-foreground">
+                <svg 
+                  xmlns="http://www.w3.org/2000/svg" 
+                  width="16" 
+                  height="16" 
+                  viewBox="0 0 24 24" 
+                  fill="none" 
+                  stroke="currentColor" 
+                  strokeWidth="2" 
+                  strokeLinecap="round" 
+                  strokeLinejoin="round" 
+                  className="feather feather-info"
+                  aria-label="When enabled, the search box won't automatically receive focus when the field reference menu appears."
+                >
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="12" y1="16" x2="12" y2="12"></line>
+                  <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                </svg>
+              </div>
             </div>
           </div>
         )}
