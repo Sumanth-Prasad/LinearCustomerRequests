@@ -168,7 +168,7 @@ function FieldCard({
       
       {field.type === "select" && (
         <select 
-          className="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
+          className="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground dark:bg-[#1a1a1a] dark:text-white dark:border-[#333] dark:focus:border-blue-600"
           disabled
         >
           <option value="">Select an option</option>
@@ -957,7 +957,7 @@ export function FormBuilder() {
               type="text" 
               value={field.label} 
               onChange={(e) => updateField(field.id, { label: e.target.value })}
-              className="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background"
+              className="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground dark:bg-[#1a1a1a] dark:text-white dark:border-[#333] dark:focus:border-blue-600"
             />
           </div>
           
@@ -981,7 +981,7 @@ export function FormBuilder() {
                       }
                     }}
                     list={`domains-${field.id}`}
-                    className={`w-full pl-10 p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-background appearance-none ${
+                    className={`w-full pl-10 p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary bg-background appearance-none dark:bg-[#1a1a1a] dark:text-white dark:border-[#333] dark:focus:border-blue-600 ${
                       emailValidation[field.id]?.isValid === false 
                         ? 'border-red-500 focus:border-red-500 focus:ring-red-500/50' 
                         : emailValidation[field.id]?.isValid === true
@@ -1003,7 +1003,7 @@ export function FormBuilder() {
                     inputRefs.current.delete(field.id);
                   }
                 }}
-                className="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background"
+                className="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground dark:bg-[#1a1a1a] dark:text-white dark:border-[#333] dark:focus:border-blue-600"
               />
               <p className="text-xs text-muted-foreground mt-1">Type @ to reference other fields</p>
                 </>
@@ -1025,7 +1025,7 @@ export function FormBuilder() {
                   }
                 }}
                 rows={3}
-                className="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background"
+                className="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground dark:bg-[#1a1a1a] dark:text-white dark:border-[#333] dark:focus:border-blue-600"
               />
               <p className="text-xs text-muted-foreground mt-1">Type @ to reference other fields</p>
             </div>
@@ -1037,7 +1037,7 @@ export function FormBuilder() {
               <select 
                 value={field.countryCode || "US"}
                 onChange={(e) => updateField(field.id, { countryCode: e.target.value as any })}
-                className="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
+                className="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground dark:bg-[#1a1a1a] dark:text-white dark:border-[#333] dark:focus:border-blue-600"
               >
                 {getCountries().sort((a, b) => {
                   const nameA = en[a] || a;
@@ -1073,7 +1073,7 @@ export function FormBuilder() {
                   value={field.acceptedFileTypes || ""} 
                   onChange={(e) => updateField(field.id, { acceptedFileTypes: e.target.value })}
                   placeholder={field.type === "file" ? ".pdf,.doc,.txt" : "image/jpeg,image/png"}
-                  className="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background"
+                  className="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground dark:bg-[#1a1a1a] dark:text-white dark:border-[#333] dark:focus:border-blue-600"
                 />
                 <p className="text-xs text-muted-foreground mt-1">
                   {field.type === "file" 
@@ -1090,7 +1090,7 @@ export function FormBuilder() {
                   max="50" 
                   value={field.maxFileSize || 5} 
                   onChange={(e) => updateField(field.id, { maxFileSize: parseInt(e.target.value) })}
-                  className="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background"
+                  className="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground dark:bg-[#1a1a1a] dark:text-white dark:border-[#333] dark:focus:border-blue-600"
                 />
               </div>
               
@@ -1127,7 +1127,7 @@ export function FormBuilder() {
                     type="text" 
                     value={option} 
                     onChange={(e) => updateOption(field.id, index, e.target.value)}
-                    className="flex-1 p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background"
+                    className="flex-1 p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground dark:bg-[#1a1a1a] dark:text-white dark:border-[#333] dark:focus:border-blue-600"
                   />
                   <button 
                     onClick={(e) => { e.stopPropagation(); removeOption(field.id, index); }}
@@ -1210,7 +1210,7 @@ export function FormBuilder() {
               <select 
                 value={linearSettings.team}
                 onChange={(e) => setLinearSettings({...linearSettings, team: e.target.value})}
-                className="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
+                className="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground dark:bg-[#1a1a1a] dark:text-white dark:border-[#333] dark:focus:border-blue-600"
               >
                 <option value="">Select a team</option>
                 <option value="team1">Engineering</option>
@@ -1225,7 +1225,7 @@ export function FormBuilder() {
               <select 
                 value={linearSettings.project || ''}
                 onChange={(e) => setLinearSettings({...linearSettings, project: e.target.value || undefined})}
-                className="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
+                className="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground dark:bg-[#1a1a1a] dark:text-white dark:border-[#333] dark:focus:border-blue-600"
               >
                 <option value="">No project</option>
                 <option value="project1">Website Redesign</option>
@@ -1240,7 +1240,7 @@ export function FormBuilder() {
               <select 
                 value={linearSettings.status || ''}
                 onChange={(e) => setLinearSettings({...linearSettings, status: e.target.value || undefined})}
-                className="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
+                className="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground dark:bg-[#1a1a1a] dark:text-white dark:border-[#333] dark:focus:border-blue-600"
               >
                 <option value="">Default status</option>
                 <option value="status1">Backlog</option>
@@ -1267,7 +1267,7 @@ export function FormBuilder() {
                 <div className="flex items-center border-t pt-2">
                   <input 
                     type="text" 
-                    className="flex-1 p-1 bg-background border-0 focus:ring-0 text-sm" 
+                    className="flex-1 p-1 bg-background border-0 focus:ring-0 text-sm text-foreground dark:bg-[#1a1a1a] dark:text-white" 
                     placeholder="Search and add labels..."
                   />
                 </div>
@@ -1280,7 +1280,7 @@ export function FormBuilder() {
               <select 
                 value={linearSettings.assignee || ''}
                 onChange={(e) => setLinearSettings({...linearSettings, assignee: e.target.value || undefined})}
-                className="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
+                className="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground dark:bg-[#1a1a1a] dark:text-white dark:border-[#333] dark:focus:border-blue-600"
               >
                 <option value="">Unassigned</option>
                 <option value="me">Me (Current User)</option>
@@ -1305,7 +1305,7 @@ export function FormBuilder() {
                   }
                 }}
                 placeholder="Customer Request: {title}"
-                className="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background"
+                className="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground dark:bg-[#1a1a1a] dark:text-white dark:border-[#333] dark:focus:border-blue-600"
               />
                 {linearSettings.defaultTitle && linearSettings.defaultTitle.includes('@') && (
                   <div className="absolute inset-0 pointer-events-none p-2 flex items-center">
@@ -1395,7 +1395,7 @@ export function FormBuilder() {
                 }}
                 placeholder="Thank you for your feedback!"
                 rows={5}
-                className="w-full p-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground" 
+                className="w-full p-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground dark:bg-[#1a1a1a] dark:text-white dark:border-[#333] dark:focus:border-blue-600" 
               />
                 {linearSettings.responseMessage && linearSettings.responseMessage.includes('@') && (
                   <div className="absolute inset-0 pointer-events-none p-2 pt-10">
@@ -1588,7 +1588,7 @@ export function FormBuilder() {
           <select 
             value={newFieldType}
             onChange={(e) => setNewFieldType(e.target.value as FieldType)}
-            className="p-2 border rounded-md mr-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
+            className="p-2 border rounded-md mr-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground dark:bg-[#1a1a1a] dark:text-white dark:border-[#333] dark:focus:border-blue-600"
           >
             <option value="text">Text</option>
             <option value="email">Email</option>

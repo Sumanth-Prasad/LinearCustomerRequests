@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
+import { useTheme } from "next-themes";
 
 type FieldType = "text" | "textarea" | "select" | "checkbox" | "radio" | "email" | "phone" | "file" | "image";
 
@@ -42,6 +43,24 @@ export function MentionCombobox({
   const [focusedIndex, setFocusedIndex] = useState<number>(0);
   const [activeSection, setActiveSection] = useState<string>('text');
   const commandRef = useRef<HTMLDivElement>(null);
+  const { theme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  
+  // Set mounted state on client
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Calculate dropdown background color based on theme
+  const getBackgroundColor = () => {
+    if (!mounted) return "white";
+    return theme === "dark" ? "#1e1e1e" : "white";
+  };
+  
+  const getTextColor = () => {
+    if (!mounted) return "black";
+    return theme === "dark" ? "white" : "black";
+  };
   
   // Filter fields based on search term and exclude current field
   const filteredFields = fields.filter(field => 
@@ -236,20 +255,30 @@ export function MentionCombobox({
     <div
       ref={commandRef}
       tabIndex={0}
-      className="outline-none focus:outline-none w-full bg-popover text-popover-foreground"
+      className="outline-none focus:outline-none w-full"
       onKeyDown={handleKeyDown}
+      style={{ 
+        backgroundColor: getBackgroundColor(),
+        color: getTextColor()
+      }}
     >
-      <Command shouldFilter={false} className="overflow-visible bg-popover border-none rounded-md">
+      <Command shouldFilter={false} className="overflow-visible border-none rounded-md"
+        style={{ backgroundColor: getBackgroundColor() }}>
         <CommandInput 
           placeholder="Search fields..." 
           value={searchTerm}
           onValueChange={onSearchChange}
           autoFocus={!disableSearchByDefault}
-          className="border-none focus:ring-0 outline-none text-popover-foreground bg-transparent font-medium"
+          className="border-none focus:ring-0 outline-none font-medium"
+          style={{ 
+            backgroundColor: "transparent",
+            color: getTextColor()
+          }}
         />
         <div className="flex border-t border-border">
           {/* Sidebar */}
-          <div className="w-10 border-r border-border bg-muted/50">
+          <div className="w-10 border-r border-border" 
+            style={{ backgroundColor: theme === "dark" ? "#252525" : "#f5f5f5" }}>
             <div className="py-1">
               {sidebarItems.map((item) => (
                 <button
@@ -257,7 +286,7 @@ export function MentionCombobox({
                   onClick={() => setActiveSection(item.id)}
                   className={cn(
                     "w-full p-2 flex justify-center hover:bg-accent hover:text-accent-foreground transition-colors",
-                    activeSection === item.id ? "bg-primary text-primary-foreground" : "text-muted-foreground"
+                    activeSection === item.id ? "bg-primary text-primary-foreground" : ""
                   )}
                   title={item.label}
                 >
@@ -268,10 +297,12 @@ export function MentionCombobox({
           </div>
 
           {/* Main content */}
-          <div className="flex-1">
-            <CommandList className="bg-popover max-h-[300px]">
+          <div className="flex-1" style={{ backgroundColor: getBackgroundColor() }}>
+            <CommandList className="max-h-[300px]" style={{ backgroundColor: getBackgroundColor() }}>
               {visibleSections.length === 0 && (
-                <CommandEmpty className="text-popover-foreground py-6 text-sm text-center">No fields found</CommandEmpty>
+                <CommandEmpty className="py-6 text-sm text-center" style={{ color: getTextColor() }}>
+                  No fields found
+                </CommandEmpty>
               )}
 
               {visibleSections.includes('utilities') && hasUtilitySection && (
@@ -280,9 +311,12 @@ export function MentionCombobox({
                     value="current_date"
                     onSelect={() => onSelectItem('current_date')}
                     className={cn(
-                      "cursor-pointer transition-colors text-popover-foreground hover:bg-accent hover:text-accent-foreground my-1 px-2 py-2 rounded-md",
+                      "cursor-pointer transition-colors hover:bg-accent hover:text-accent-foreground my-1 px-2 py-2 rounded-md",
                       focusedIndex === allItems.length ? "bg-primary text-primary-foreground font-medium border-l-4 border-primary shadow-sm" : ""
                     )}
+                    style={{ 
+                      color: focusedIndex === allItems.length ? "" : getTextColor()
+                    }}
                   >
                     <span className={cn(
                       "mr-2",
@@ -320,9 +354,12 @@ export function MentionCombobox({
                               value={field.id}
                               onSelect={() => onSelectItem(field.id)}
                               className={cn(
-                                "cursor-pointer transition-colors text-popover-foreground hover:bg-accent hover:text-accent-foreground my-1 px-2 py-2 rounded-md",
+                                "cursor-pointer transition-colors hover:bg-accent hover:text-accent-foreground my-1 px-2 py-2 rounded-md",
                                 focusedIndex === absoluteIndex ? "bg-primary text-primary-foreground font-medium border-l-4 border-primary shadow-sm" : ""
                               )}
+                              style={{ 
+                                color: focusedIndex === absoluteIndex ? "" : getTextColor()
+                              }}
                               onMouseEnter={() => setFocusedIndex(absoluteIndex)}
                             >
                               <span className={cn(
@@ -343,7 +380,7 @@ export function MentionCombobox({
                         })}
                       </>
                     ) : (
-                      <ScrollArea className="h-[150px] bg-popover">
+                      <ScrollArea className="h-[150px]" style={{ backgroundColor: getBackgroundColor() }}>
                         {groupFields.map((field, fieldIndex) => {
                           const absoluteIndex = getAbsoluteIndex(groupIndex, fieldIndex);
                           return (
@@ -352,9 +389,12 @@ export function MentionCombobox({
                               value={field.id}
                               onSelect={() => onSelectItem(field.id)}
                               className={cn(
-                                "cursor-pointer transition-colors text-popover-foreground hover:bg-accent hover:text-accent-foreground my-1 px-2 py-2 rounded-md",
+                                "cursor-pointer transition-colors hover:bg-accent hover:text-accent-foreground my-1 px-2 py-2 rounded-md",
                                 focusedIndex === absoluteIndex ? "bg-primary text-primary-foreground font-medium border-l-4 border-primary shadow-sm" : ""
                               )}
+                              style={{ 
+                                color: focusedIndex === absoluteIndex ? "" : getTextColor()
+                              }}
                               onMouseEnter={() => setFocusedIndex(absoluteIndex)}
                             >
                               <span className={cn(
