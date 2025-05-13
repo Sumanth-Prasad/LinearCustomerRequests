@@ -63,29 +63,57 @@ export function processMentionSelection(
   }
   
   // The displayed badge text (for length calculation)
-  const visibleText = `@${fieldLabel}`;
+  const visibleText = fieldLabel;
   const visibleLength = visibleText.length;
   
   // Add a ZERO-WIDTH JOINER character (U+200D) as the marker
   const marker = '\u200D';
   
-  // Replace the @searchTerm with the marker
+  // Calculate the end of the @searchTerm
+  const searchTermEndIndex = atSymbolIndex + 1 + searchTerm.length;
+  
+  // Replace the @searchTerm with the marker and add a space after
+  const spacer = '  '; // Two spaces for better cursor visibility
   const newValue =
     value.substring(0, atSymbolIndex) +
     marker +
-    value.substring(atSymbolIndex + 1 + searchTerm.length);
+    value.substring(searchTermEndIndex) + 
+    spacer; // Add spaces to ensure cursor is visible
   
   // Calculate new cursor position
-  const newCaretPosition = atSymbolIndex + 1;
+  // Position after the marker + spacer (ensure we're not at the beginning)
+  const newCaretPosition = atSymbolIndex + 1 + spacer.length; 
+  
+  console.log('Cursor position calculation:', {
+    atSymbolIndex,
+    markerLength: 1,
+    spacerLength: spacer.length,
+    calculatedPosition: newCaretPosition,
+    valueBeforeCaret: newValue.substring(0, newCaretPosition),
+    valueAtCaret: newValue.substring(newCaretPosition - 3, newCaretPosition + 3)
+  });
   
   // Create the mention object
   const mention: FieldMention = {
     id: fieldId,
     label: fieldLabel,
     startPos: atSymbolIndex,
-    endPos: atSymbolIndex + 1,
+    endPos: atSymbolIndex + 1, // Just the marker
     length: visibleLength
   };
+  
+  console.log('Creating mention with added space:', {
+    id: fieldId,
+    label: fieldLabel,
+    atSymbolIndex,
+    searchTerm,
+    searchTermEndIndex,
+    startPos: atSymbolIndex,
+    endPos: atSymbolIndex + 1,
+    newValue,
+    valueAt: newValue.substring(atSymbolIndex, atSymbolIndex + 5),
+    newCaretPosition
+  });
   
   return { newValue, newCaretPosition, mention };
 }
@@ -123,7 +151,7 @@ export function extractMentionsFromText(
       label: fieldLabel,
       startPos: pos,
       endPos: pos + 1,
-      length: fieldLabel.length + 1 // +1 for @
+      length: fieldLabel.length
     });
   }
   

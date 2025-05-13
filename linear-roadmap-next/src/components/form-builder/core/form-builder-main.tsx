@@ -15,6 +15,17 @@ import { getDefaultPlaceholder, createNewField } from "../utils/field-utils";
 import { updateField, removeField as removeFieldOp, addOption, removeOption, updateOption } from "../utils/field-operations";
 import type { FieldType, FormField, FieldMention, MentionMenuState, LinearIntegrationSettings } from "./types";
 
+// Add the global declaration for our helper methods
+declare global {
+  interface Window {
+    _badgeInputHelpers?: {
+      [fieldId: string]: {
+        restoreCursorAfterDelete: (position: number) => void;
+      };
+    };
+  }
+}
+
 // ========== FORM BUILDER COMPONENT ==========
 export default function FormBuilder() {
   // ===== STATE MANAGEMENT =====
@@ -317,14 +328,6 @@ export default function FormBuilder() {
     
     const currentInputId = mentionMenu.inputId; 
     const currentSearchTerm = mentionMenu.searchTerm;
-
-    // Close menu immediately
-    setMentionMenu({
-      isOpen: false,
-      inputId: null,
-      position: { top: 0, left: 0 },
-      searchTerm: ""
-    });
     
     // Process mention selection
     try {
@@ -339,10 +342,16 @@ export default function FormBuilder() {
         currentSearchTerm
       );
       
-      // Update input and state
-      inputElement.value = newValue;
-      inputElement.focus();
-      inputElement.setSelectionRange(newCaretPosition, newCaretPosition);
+      // Close menu
+      setMentionMenu({
+        isOpen: false,
+        inputId: null,
+        position: { top: 0, left: 0 },
+        searchTerm: ""
+      });
+      
+      // Update field or settings value
+      updateFieldOrSettingValue(currentInputId, newValue);
       
       // Update mentions state
       setMentions(prev => {
@@ -353,10 +362,33 @@ export default function FormBuilder() {
         };
       });
       
-      // Update field or settings value
-      updateFieldOrSettingValue(currentInputId, newValue);
+      // Store cursor position for a ref to use later
+      const desiredCursorPos = newCaretPosition;
+      
+      // Use timeout to ensure the component has updated
+      setTimeout(() => {
+        // Ensure the input has the updated value
+        inputElement.value = newValue;
+        
+        // Focus and set cursor position
+        inputElement.focus();
+        
+        // Set cursor position
+        inputElement.setSelectionRange(desiredCursorPos, desiredCursorPos);
+        
+        // Log for debugging
+        console.log('Set cursor to position:', desiredCursorPos);
+      }, 100);
     } catch (error) {
       console.error("Error processing mention selection:", error);
+      
+      // Close menu on error
+      setMentionMenu({
+        isOpen: false,
+        inputId: null,
+        position: { top: 0, left: 0 },
+        searchTerm: ""
+      });
     }
   };
 
@@ -367,36 +399,92 @@ export default function FormBuilder() {
     mentionStartPos: number,
     mentionEndPos: number
   ) => {
-    // Update mentions list
-    setMentions(prev => ({
-      ...prev,
-      [fieldId]: (prev[fieldId] || []).filter(m => 
-        !(m.id === mentionId && m.startPos === mentionStartPos))
-    }));
+    console.log('Removing mention:', { fieldId, mentionId, mentionStartPos, mentionEndPos });
     
-    // Get current value and remove the mention
-    let currentValue = '';
-    if (fieldId === 'response_message') {
-      currentValue = linearSettings.responseMessage;
-    } else if (fieldId === 'default_title') {
-      currentValue = linearSettings.defaultTitle;
-    } else {
-      const field = fields.find(f => f.id === fieldId);
-      currentValue = field?.placeholder || '';
+    // Get input element first - we need to ensure we have access to it
+    const inputEl = inputRefs.current.get(fieldId);
+    if (!inputEl) {
+      console.error('Input element not found for mention removal');
+      return;
     }
     
-    const newValue = currentValue.substring(0, mentionStartPos) + 
-      currentValue.substring(mentionEndPos);
-    
-    // Update field or settings
-    updateFieldOrSettingValue(fieldId, newValue);
-    
-    // Update input element
-    const inputEl = inputRefs.current.get(fieldId);
-    if (inputEl) {
-      inputEl.value = newValue;
-      inputEl.focus();
-      inputEl.setSelectionRange(mentionStartPos, mentionStartPos);
+    try {
+      // CRITICAL: Store the exact position where the cursor should be after deletion
+      const targetCursorPos = mentionStartPos;
+      console.log(`Target cursor position after deletion: ${targetCursorPos}`);
+      
+      // Get current value from the actual input element
+      let currentValue = inputEl.value;
+      
+      // Replace the zero-width joiner with an empty string (removing it completely)
+      const newValue = currentValue.substring(0, mentionStartPos) + 
+        currentValue.substring(mentionEndPos);
+      
+      // Update field or settings value first
+      updateFieldOrSettingValue(fieldId, newValue);
+      
+      // Then update mentions state
+      setMentions(prev => {
+        const updatedMentions = {
+          ...prev,
+          [fieldId]: (prev[fieldId] || []).filter(m => 
+            !(m.id === mentionId && m.startPos === mentionStartPos))
+        };
+        console.log('Updated mentions:', updatedMentions);
+        return updatedMentions;
+      });
+      
+      // Try to use the badge input helper if available
+      if (window._badgeInputHelpers && window._badgeInputHelpers[fieldId]) {
+        console.log('Using badge input helper to restore cursor');
+        window._badgeInputHelpers[fieldId].restoreCursorAfterDelete(targetCursorPos);
+      }
+      
+      // Also use our direct DOM approach as backup
+      setTimeout(() => {
+        if (!inputEl) return;
+        
+        // Now make direct DOM changes
+        inputEl.value = newValue;
+        
+        // Force focus
+        inputEl.focus();
+        
+        // Set cursor to the target position
+        inputEl.setSelectionRange(targetCursorPos, targetCursorPos);
+        
+        // Put this in a requestAnimationFrame to ensure it happens after layout
+        requestAnimationFrame(() => {
+          if (!inputEl) return;
+          // Double-check focus and cursor position
+          inputEl.focus();
+          inputEl.setSelectionRange(targetCursorPos, targetCursorPos);
+        });
+      }, 0);
+      
+      // Schedule one more focus attempt
+      setTimeout(() => {
+        if (!inputEl) return;
+        inputEl.focus();
+        inputEl.setSelectionRange(targetCursorPos, targetCursorPos);
+      }, 50);
+
+      // Final cleanup to ensure proper cursor position and focus
+      [100, 200, 300].forEach(delay => {
+        setTimeout(() => {
+          try {
+            if (!inputEl) return;
+            if (document.activeElement !== inputEl) {
+              inputEl.focus();
+            }
+            inputEl.setSelectionRange(targetCursorPos, targetCursorPos);
+          } catch (err) {
+            console.error(`Error in final focus recovery at ${delay}ms:`, err);
+          }
+        }, delay);
+      });
+    } catch (err) {
+      console.error('Error in handleRemoveMention:', err);
     }
   };
 
@@ -418,7 +506,21 @@ export default function FormBuilder() {
           mention.startPos === caretPosition - 1);
         
         if (mentionIndex !== -1) {
+          // Get the mention details
           const mention = fieldMentions[mentionIndex];
+          
+          // Calculate cursor position
+          const targetCursorPos = mention.startPos;
+          console.log(`Backspace press detected - target cursor position: ${targetCursorPos}`);
+          
+          // Store the cursor position directly in the badge input helper
+          if (window._badgeInputHelpers && window._badgeInputHelpers[fieldId]) {
+            // Pre-notify the BadgeInput component where the cursor should be
+            console.log('Pre-notifying BadgeInput component about cursor position');
+            window._badgeInputHelpers[fieldId].restoreCursorAfterDelete(targetCursorPos);
+          }
+          
+          // Now remove the mention
           handleRemoveMention(fieldId, mention.id, mention.startPos, mention.endPos);
         }
       }
@@ -441,6 +543,16 @@ export default function FormBuilder() {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [mentionMenu]);
+
+  // Ensure input focus is maintained when needed
+  useEffect(() => {
+    if (mentionMenu.inputId) {
+      const inputElement = inputRefs.current.get(mentionMenu.inputId);
+      if (inputElement && document.activeElement !== inputElement) {
+        inputElement.focus();
+      }
+    }
+  }, [mentionMenu.inputId, mentions]);
 
   // ===== RENDER =====
   return (

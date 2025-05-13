@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { BadgeInput } from "./badge-input";
+import { BadgeInput } from "../mentions/badge-input";
 import type { LinearIntegrationSettings, FieldMention } from "./types";
 
 interface LinearSettingsProps {
