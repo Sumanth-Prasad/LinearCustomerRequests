@@ -173,12 +173,75 @@ export default function FormBuilder() {
        (atSymbolIndex === 0 || textBeforeCaret[atSymbolIndex - 1] === ' ')) {
       // Found unprocessed @ symbol, show mention menu
       const searchTerm = textBeforeCaret.substring(atSymbolIndex + 1).toLowerCase();
-      const position = calculateMentionMenuPosition(inputElement, textBeforeCaret, atSymbolIndex);
+      
+      console.log('@ detected at index:', atSymbolIndex);
+      
+      // Get input element's position
+      const inputRect = inputElement.getBoundingClientRect();
+      const isTextarea = inputElement.tagName.toLowerCase() === 'textarea';
+      const containerRect = formContainerRef.current?.getBoundingClientRect() || { top: 0, left: 0 };
+      const computedStyle = window.getComputedStyle(inputElement);
+      
+      // Create a temporary span to measure text width
+      const tempSpan = document.createElement('span');
+      tempSpan.style.font = computedStyle.font;
+      tempSpan.style.fontSize = computedStyle.fontSize;
+      tempSpan.style.fontFamily = computedStyle.fontFamily;
+      tempSpan.style.letterSpacing = computedStyle.letterSpacing;
+      tempSpan.style.position = 'absolute';
+      tempSpan.style.visibility = 'hidden';
+      tempSpan.style.whiteSpace = 'pre';
+      
+      let top, left;
+      
+      if (isTextarea) {
+        // For textareas, position based on line breaks
+        const lines = textBeforeCaret.split('\n');
+        const lineBreaks = lines.length - 1;
+        const currentLine = lines[lineBreaks];
+        const lineHeight = parseInt(computedStyle.lineHeight) || 20;
+        
+        // Find position of @ in current line
+        const atPosInCurrentLine = currentLine.indexOf('@');
+        if (atPosInCurrentLine >= 0) {
+          // Measure width of text up to @
+          tempSpan.textContent = currentLine.substring(0, atPosInCurrentLine + 1); // Include @ for exact positioning
+          document.body.appendChild(tempSpan);
+          const atWidth = tempSpan.getBoundingClientRect().width;
+          document.body.removeChild(tempSpan);
+          
+          // Calculate precise position
+          const paddingLeft = parseInt(computedStyle.paddingLeft) || 0;
+          // Position to the right of @ symbol with some vertical offset for textarea
+          top = inputRect.top - containerRect.top + (lineBreaks * lineHeight) + 5;
+          left = inputRect.left - containerRect.left + paddingLeft + atWidth + 2; // Position to right of @ symbol
+        } else {
+          // Fallback
+          top = inputRect.top - containerRect.top + (lineBreaks * lineHeight) + 5;
+          left = inputRect.left - containerRect.left + 20;
+        }
+      } else {
+        // For regular inputs
+        // Measure width of text up to @
+        tempSpan.textContent = textBeforeCaret.substring(0, atSymbolIndex + 1); // Include @ for exact positioning
+        document.body.appendChild(tempSpan);
+        const atWidth = tempSpan.getBoundingClientRect().width;
+        document.body.removeChild(tempSpan);
+        
+        const paddingLeft = parseInt(computedStyle.paddingLeft) || 0;
+        // For inputs, position to the right of @ at the same vertical level
+        top = inputRect.top - containerRect.top + (inputRect.height / 2) - 15; // Vertically center, with slight adjustment
+        left = inputRect.left - containerRect.left + paddingLeft + atWidth + 2; // Position to right of @ symbol
+      }
+      
+      console.log('Input rect:', inputRect);
+      console.log('Container rect:', containerRect);
+      console.log('Positioning popup at:', { top, left });
       
       setMentionMenu({
         isOpen: true,
         inputId: fieldId,
-        position,
+        position: { top, left },
         searchTerm,
       });
     } else if (mentionMenu.isOpen && mentionMenu.inputId === fieldId) {
@@ -440,7 +503,7 @@ export default function FormBuilder() {
         inputRefs={inputRefs}
       />
 
-      {/* Mention popup */}
+      {/* Mention popup (shadcn Combobox) */}
       <MentionPopup 
         mentionMenu={mentionMenu}
         fields={fields}

@@ -25,7 +25,7 @@ export function MentionPopup({
   
   return (
     <div 
-      className="fixed z-50 w-64 overflow-hidden rounded-md border border-border shadow-md mention-dropdown"
+      className="absolute z-50 w-64 overflow-hidden rounded-md border border-border shadow-md mention-dropdown"
       style={{
         top: `${mentionMenu.position.top}px`,
         left: `${mentionMenu.position.left}px`,
