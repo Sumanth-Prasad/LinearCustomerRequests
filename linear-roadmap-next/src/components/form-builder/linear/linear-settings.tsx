@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useRef, useState } from 'react';
 import { BadgeInput } from "../mentions/badge-input";
 import { LexicalBadgeEditor } from "@/components/LexicalBadgeEditor";
 import type { LinearIntegrationSettings, FieldMention } from "./types";
@@ -254,12 +254,53 @@ export function LinearSettings({
               onChange={(v) => setLinearSettings({...linearSettings, responseMessage: v})}
               fields={fields}
               placeholder="Enter response message..."
-              className="border border-border rounded-md p-2 bg-background text-foreground"
-                fieldId="response_message"
+              className="border border-border rounded-md p-2 bg-background text-foreground min-h-[250px]"
+              fieldId="response_message"
+              isMarkdown={true}
             />
             <p className="text-xs text-muted-foreground mt-1">
-              Shown to users after form submission. Type @ to reference form fields.
+              Shown to users after form submission. Type @ to reference form fields. Supports markdown formatting.
+              Try typing # for headings, * for lists, {'>'} for quotes, ** for bold, * for italic.
             </p>
+            
+            {/* Markdown syntax help */}
+            <details className="mt-2 text-xs text-muted-foreground border border-border rounded-md p-2">
+              <summary className="cursor-pointer font-medium">Markdown Syntax Help</summary>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <div>
+                  <h4 className="font-medium">Headings</h4>
+                  <pre className="bg-gray-100 dark:bg-gray-800 p-1 rounded">
+                    # Heading 1{'\n'}
+                    ## Heading 2{'\n'}
+                    ### Heading 3
+                  </pre>
+                </div>
+                <div>
+                  <h4 className="font-medium">Formatting</h4>
+                  <pre className="bg-gray-100 dark:bg-gray-800 p-1 rounded">
+                    **Bold Text**{'\n'}
+                    *Italic Text*{'\n'}
+                    ~~Strikethrough~~
+                  </pre>
+                </div>
+                <div>
+                  <h4 className="font-medium">Lists</h4>
+                  <pre className="bg-gray-100 dark:bg-gray-800 p-1 rounded">
+                    * Unordered list item{'\n'}
+                    1. Ordered list item{'\n'}
+                    2. Another item
+                  </pre>
+                </div>
+                <div>
+                  <h4 className="font-medium">Other</h4>
+                  <pre className="bg-gray-100 dark:bg-gray-800 p-1 rounded">
+                    {'>'} Blockquote{'\n'}
+                    `inline code`{'\n'}
+                    [Link text](URL)
+                  </pre>
+                </div>
+              </div>
+            </details>
           </div>
           
           <div className="flex items-center">
