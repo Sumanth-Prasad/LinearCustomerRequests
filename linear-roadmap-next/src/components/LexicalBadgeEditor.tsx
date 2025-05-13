@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState, useLayoutEffect } from "react";
 import { LexicalComposer } from "@lexical/react/LexicalComposer";
 import { PlainTextPlugin } from "@lexical/react/LexicalPlainTextPlugin";
 import { RichTextPlugin } from "@lexical/react/LexicalRichTextPlugin";
@@ -21,6 +21,8 @@ import {
   COMMAND_PRIORITY_NORMAL,
   ElementFormatType,
   TextFormatType,
+  $setSelection,
+  SELECTION_CHANGE_COMMAND
 } from "lexical";
 import { LexicalErrorBoundary } from "@lexical/react/LexicalErrorBoundary";
 
@@ -64,6 +66,9 @@ import { mergeRegister } from "@lexical/utils";
 
 // Add ListPlugin import
 import { ListPlugin } from "@lexical/react/LexicalListPlugin";
+
+// Import the FieldType and FormField types
+import { FieldType, FormField } from "@/components/form-builder/core/types";
 
 // Define a basic theme for the editor
 const editorTheme = {
@@ -319,17 +324,75 @@ function ToolbarPlugin() {
   const handleListCommand = useCallback(
     (listType: 'bullet' | 'number') => {
       if (activeEditor) {
-        // Determine which command to use based on the list type
-        const command = 
-          listType === 'bullet' 
-            ? INSERT_UNORDERED_LIST_COMMAND 
-            : INSERT_ORDERED_LIST_COMMAND;
-        
-        // Execute the list command
-        activeEditor.dispatchCommand(command, undefined);
+        // Check if we're already in this list type
+        if ((listType === 'bullet' && isListActive.bullet) || 
+            (listType === 'number' && isListActive.numbered)) {
+          // We need to remove the list - convert to paragraphs
+          activeEditor.update(() => {
+            const selection = $getSelection();
+            if ($isRangeSelection(selection)) {
+              // Find the list node to convert
+              const nodes = selection.getNodes();
+              
+              // Start with the anchor node's ancestors
+              let currentNode: any = selection.anchor.getNode();
+              
+              // Find the list item first (could be the node or an ancestor)
+              let listItemNode: any = null;
+              while (currentNode && !$isListItemNode(currentNode)) {
+                currentNode = currentNode.getParent();
+              }
+              
+              if (currentNode && $isListItemNode(currentNode)) {
+                listItemNode = currentNode;
+                // Now find the parent list
+                let listNode = listItemNode.getParent();
+                
+                // Convert to paragraphs
+                if (listNode && $isListNode(listNode)) {
+                  // Extract all list item content to paragraphs
+                  const listItems = listNode.getChildren();
+                  
+                  // Create a paragraph for each list item
+                  const paragraphs: Array<any> = [];
+                  listItems.forEach(item => {
+                    if ($isListItemNode(item)) {
+                      const paragraph = $createParagraphNode();
+                      item.getChildren().forEach(child => {
+                        paragraph.append(child);
+                      });
+                      paragraphs.push(paragraph);
+                    }
+                  });
+                  
+                  // Replace the list with the paragraphs
+                  if (paragraphs.length > 0) {
+                    listNode.replace(paragraphs[0]);
+                    
+                    // Insert the rest after the first one
+                    let prevNode = paragraphs[0];
+                    for (let i = 1; i < paragraphs.length; i++) {
+                      prevNode.insertAfter(paragraphs[i]);
+                      prevNode = paragraphs[i];
+                    }
+                  }
+                }
+              }
+            }
+          });
+        } else {
+          // Determine which command to use based on the list type
+          const command = 
+            listType === 'bullet' 
+              ? INSERT_UNORDERED_LIST_COMMAND 
+              : INSERT_ORDERED_LIST_COMMAND;
+          
+          // Execute the list command
+          activeEditor.dispatchCommand(command, undefined);
+        }
       }
     },
-    [activeEditor]
+    [activeEditor, isListActive]
   );
 
   // Toolbar component
@@ -745,21 +808,21 @@ interface LexicalBadgeEditorProps {
   className?: string;
   fieldId?: string;
   isMarkdown?: boolean; // New prop to enable markdown mode
+  disableMarkdownShortcuts?: boolean; // New prop to disable markdown shortcuts
+  hideMarkdownHelp?: boolean; // New prop to hide markdown help dropdown
 }
 
-// Local replica of FormField type used by the mention combobox.
-type FieldType = "text" | "textarea" | "select" | "checkbox" | "radio" | "email" | "phone" | "file" | "image";
-
-interface FormField {
-  id: string;
-  type: FieldType;
-  label: string;
-  placeholder?: string;
-  required: boolean;
-  options?: string[];
-}
-
-export function LexicalBadgeEditor({ value, onChange, fields, placeholder, className, fieldId, isMarkdown = false }: LexicalBadgeEditorProps) {
+export function LexicalBadgeEditor({ 
+  value, 
+  onChange, 
+  fields, 
+  placeholder, 
+  className, 
+  fieldId, 
+  isMarkdown = false, 
+  disableMarkdownShortcuts = false,
+  hideMarkdownHelp = false
+}: LexicalBadgeEditorProps) {
   // Use shared editor config with explicitly defined nodes
   const initialConfig = useMemo(() => {
     // Make sure all nodes are registered explicitly
@@ -780,8 +843,9 @@ export function LexicalBadgeEditor({ value, onChange, fields, placeholder, class
       onError: (e: Error) => {
         console.error(e);
       },
-      // If in markdown mode and value exists, initialize from markdown string
-      editorState: isMarkdown && value ? 
+      // Start with an empty editor instead of loading content
+      // Only load content if value is non-empty
+      editorState: value && value.trim() !== '' && isMarkdown ? 
         () => $convertFromMarkdownString(value, TRANSFORMERS) : 
         undefined
     };
@@ -837,34 +901,79 @@ export function LexicalBadgeEditor({ value, onChange, fields, placeholder, class
   // Use a custom set of transformers to ensure lists work properly
   const customTransformers = [...TRANSFORMERS];
 
+  // Initialize with empty value to allow placeholder to show
+  const initialValue = value || '';
+
+  // Placeholder component with direct DOM access for proper positioning
+  const PlaceholderComponent = ({ text }: { text?: string }) => {
+    const placeholderRef = useRef<HTMLDivElement>(null);
+    const [editor] = useLexicalComposerContext();
+    
+    useLayoutEffect(() => {
+      // Position the placeholder immediately when DOM is ready
+      const positionPlaceholder = () => {
+        if (!placeholderRef.current) return;
+        
+        // Get the cursor position from the actual editor
+        const rootElement = editor.getRootElement();
+        if (!rootElement) return;
+        
+        // For markdown mode with toolbar, position differently
+        const topPosition = isMarkdown ? 45 : 8;
+        
+        // Apply positioning directly to the placeholder element
+        placeholderRef.current.style.position = 'absolute';
+        placeholderRef.current.style.top = `${topPosition}px`;
+        placeholderRef.current.style.left = '10px';
+        placeholderRef.current.style.opacity = '0.65';
+        placeholderRef.current.style.pointerEvents = 'none';
+        placeholderRef.current.style.userSelect = 'none';
+        placeholderRef.current.style.color = 'var(--muted-foreground, #888)';
+        placeholderRef.current.style.zIndex = '0';
+        placeholderRef.current.style.margin = '0';
+        placeholderRef.current.style.padding = '0';
+      };
+      
+      // Position initially
+      positionPlaceholder();
+      
+      // Check on window resize
+      window.addEventListener('resize', positionPlaceholder);
+      return () => {
+        window.removeEventListener('resize', positionPlaceholder);
+      };
+    }, [editor, isMarkdown]);
+    
+    return (
+      <div ref={placeholderRef} className="placeholder">
+        {text}
+      </div>
+    );
+  };
+
   return (
-    <div ref={containerRef} className={className + " relative"}>
+    <div ref={containerRef} className={className + " relative lexical-editor-container"}>
       <LexicalComposer initialConfig={initialConfig}>
         {isMarkdown && <ToolbarPlugin />}
         
         {isMarkdown ? (
-          // Use RichTextPlugin for markdown editing for better formatting support
           <RichTextPlugin
             contentEditable={<ContentEditable className="w-full resize-none outline-none bg-transparent py-2 px-2" />}
             placeholder={
-              <div className="absolute top-0 left-0 text-muted-foreground pointer-events-none px-2 pt-[3.25rem]">
-                {placeholder}
-              </div>
+              <PlaceholderComponent text={placeholder} />
             }
             ErrorBoundary={LexicalErrorBoundary}
           />
         ) : (
-          // Use PlainTextPlugin for regular badging without markdown
           <PlainTextPlugin
             contentEditable={<ContentEditable className="w-full resize-none outline-none bg-transparent py-2 px-2" />}
             placeholder={
-              <div className="absolute top-0 left-0 text-muted-foreground pointer-events-none px-2 pt-2">
-                {placeholder}
-              </div>
+              <PlaceholderComponent text={placeholder} />
             }
             ErrorBoundary={LexicalErrorBoundary}
           />
         )}
+        
         <HistoryPlugin />
         <OnChangePlugin onChange={handleEditorChange} />
         <MentionPlugin fields={fields} fieldId={fieldId} containerRef={containerRef} />
@@ -875,8 +984,8 @@ export function LexicalBadgeEditor({ value, onChange, fields, placeholder, class
         {/* Add AutoLinkPlugin when in markdown mode */}
         {isMarkdown && <AutoLinkPlugin matchers={MATCHERS} />}
         
-        {/* Add markdown shortcuts when in markdown mode */}
-        {isMarkdown && <MarkdownShortcutPlugin transformers={customTransformers} />}
+        {/* Add markdown shortcuts when in markdown mode and not disabled */}
+        {isMarkdown && !disableMarkdownShortcuts && <MarkdownShortcutPlugin transformers={customTransformers} />}
         
         {/* Add auto-focus plugin */}
         <AutoFocusPlugin />

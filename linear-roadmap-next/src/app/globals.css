@@ -154,5 +154,78 @@
     background-color: oklch(0.145 0 0);
     color: oklch(0.985 0 0);
   }
+  
+  /* Fix select dropdowns in dark mode */
+  select {
+    color: var(--foreground);
+    background-color: var(--input);
+  }
+
+  .dark select option {
+    background-color: var(--card);
+    color: var(--card-foreground);
+  }
+}
+
+/* Drag handle styling */
+.cursor-grab {
+  cursor: grab;
+}
+
+.cursor-grab:active {
+  cursor: grabbing;
+}
+
+/* Add subtle animation for drag handle on hover */
+.cursor-grab:hover svg {
+  transform: scale(1.1);
+  transition: transform 0.2s ease;
+}
+
+.cursor-grab svg {
+  transition: transform 0.2s ease;
+}
+
+/* Ensure dragging state looks good */
+[data-dragging="true"] {
+  z-index: 10;
+  position: relative;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+/* Fix DnD overlay opacity */
+.dnd-draggable-preview {
+  opacity: 1 !important;
+  background-color: var(--card);
+  border-color: var(--primary);
+}
+
+/* Override any default drag styles */
+[data-dnd-draggable] {
+  opacity: 1 !important;
+}
+
+div[role="button"] {
+  opacity: 1 !important;
+}
+
+/* Make sure the drag overlay is fully opaque */
+div[style*="pointer-events: none"] {
+  opacity: 1 !important;
+}
+
+/* Additional forceful opacity for drag overlay */
+[style*="position: fixed"] {
+  opacity: 1 !important;
+  background-color: var(--card) !important;
+}
+
+/* Target the DnD-kit drag overlay specifically */
+[style*="position: fixed"][role="presentation"] {
+  opacity: 1 !important;
+  transform-origin: 0 0 !important;
+  pointer-events: none !important;
+  background-color: var(--card) !important;
+  z-index: 9999 !important;
 }
 

@@ -7,13 +7,14 @@ import validator from 'validator';
 import { CursorStyleFix } from "../mentions/cursor-style-fix";
 import { FormToolbar } from "./form-toolbar";
 import { FormPreview } from "./form-preview";
+import { FormSettingsPanel } from "./form-settings";
 import { FieldEditor } from "../fields/field-editor";
 import { LinearSettings } from "../linear/linear-settings";
 import { MentionPopup } from "../mentions/mention-popup";
 import { updateMentionPositions, processMentionSelection } from "../mentions/mention-utils";
 import { getDefaultPlaceholder, createNewField } from "../utils/field-utils";
 import { updateField, removeField as removeFieldOp, addOption, removeOption, updateOption } from "../utils/field-operations";
-import type { FieldType, FormField, FieldMention, MentionMenuState, LinearIntegrationSettings } from "./types";
+import type { FieldType, FormField, FieldMention, MentionMenuState, LinearIntegrationSettings, FormSettings, FormType } from "./types";
 import { LexicalBadgeEditor } from "@/components/LexicalBadgeEditor";
 
 // Add the global declaration for our helper methods
@@ -47,6 +48,46 @@ export default function FormBuilder() {
       required: true,
     },
   ]);
+  
+  // Form settings state
+  const [formSettings, setFormSettings] = useState<FormSettings>({
+    title: "Feature Request Form",
+    type: "feature",
+    description: "Submit a feature request for our product.",
+    emoji: "✨"
+  });
+  
+  // Update Linear title format when form type changes
+  useEffect(() => {
+    // Generate appropriate title format based on form type
+    let titleFormat = '';
+    
+    switch (formSettings.type) {
+      case 'bug':
+        titleFormat = '🐛 Bug: {title}';
+        break;
+      case 'feature':
+        titleFormat = '✨ Feature Request: {title}';
+        break;
+      case 'feedback':
+        titleFormat = '💬 Feedback: {title}';
+        break;
+      case 'question':
+        titleFormat = '❓ Question: {title}';
+        break;
+      case 'custom':
+        titleFormat = `${formSettings.emoji} ${formSettings.customType || 'Request'}: {title}`;
+        break;
+      default:
+        titleFormat = '{title}';
+    }
+    
+    // Update Linear settings with the new title format
+    setLinearSettings(prev => ({
+      ...prev,
+      defaultTitle: titleFormat
+    }));
+  }, [formSettings.type, formSettings.customType, formSettings.emoji]);
   
   // Linear integration state
   const [linearSettings, setLinearSettings] = useState<LinearIntegrationSettings>({
@@ -114,7 +155,11 @@ export default function FormBuilder() {
   
   // Save the form
   const handleSaveForm = () => {
-    console.log("Saving form:", { fields, linearSettings });
+    console.log("Saving form:", { 
+      formSettings,
+      fields, 
+      linearSettings 
+    });
     // API call or other logic for saving would go here
   };
 
@@ -568,12 +613,19 @@ export default function FormBuilder() {
         onSave={handleSaveForm}
       />
       
+      {/* Form Settings */}
+      <FormSettingsPanel 
+        settings={formSettings} 
+        onUpdateSettings={setFormSettings} 
+      />
+      
       {/* Main content area */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
         {/* Form preview panel */}
         <div className="lg:col-span-7">
           <FormPreview 
             fields={fields}
+            formSettings={formSettings}
             activeField={activeField}
             setActiveField={setActiveField}
             setFields={setFields}
@@ -605,6 +657,7 @@ export default function FormBuilder() {
       <LinearSettings 
         linearSettings={linearSettings}
         setLinearSettings={setLinearSettings}
+        formSettings={formSettings}
         showLinearSettings={showLinearSettings}
         setShowLinearSettings={setShowLinearSettings}
         mentions={mentions}

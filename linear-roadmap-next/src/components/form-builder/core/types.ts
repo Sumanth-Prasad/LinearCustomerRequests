@@ -1,6 +1,16 @@
 import type { Country } from 'react-phone-number-input';
 
-export type FieldType = "text" | "textarea" | "select" | "checkbox" | "radio" | "email" | "phone" | "file" | "image";
+export type FieldType = "text" | "textarea" | "select" | "checkbox" | "radio" | "email" | "phone" | "file" | "image" | "url";
+
+export type FormType = "bug" | "feature" | "feedback" | "question" | "custom";
+
+export interface FormSettings {
+  title: string;
+  type: FormType;
+  description?: string;
+  customType?: string; // Used when type is "custom"
+  emoji: string; // Store the emoji character
+}
 
 export interface FormField {
   id: string;

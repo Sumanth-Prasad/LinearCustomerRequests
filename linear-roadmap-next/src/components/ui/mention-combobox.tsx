@@ -5,21 +5,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { useTheme } from "next-themes";
-
-type FieldType = "text" | "textarea" | "select" | "checkbox" | "radio" | "email" | "phone" | "file" | "image";
-
-interface FormField {
-  id: string;
-  type: FieldType;
-  label: string;
-  placeholder?: string;
-  required: boolean;
-  options?: string[];
-  countryCode?: string;
-  acceptedFileTypes?: string;
-  multiple?: boolean;
-  maxFileSize?: number;
-}
+import { FieldType, FormField } from "@/components/form-builder/core/types";
 
 interface MentionComboboxProps {
   fields: FormField[];
@@ -91,6 +77,7 @@ export function MentionCombobox({
           break;
         case 'email':
         case 'phone':
+        case 'url':
           groups['Contact Fields'].push(field);
           break;
         case 'file':

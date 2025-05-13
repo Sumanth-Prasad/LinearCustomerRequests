@@ -4,7 +4,7 @@ import React from "react";
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { FieldCard } from "./field-card";
-import type { FormField } from "./types";
+import type { FormField } from "../core/types";
 
 interface SortableFieldProps {
   field: FormField;
@@ -43,7 +43,11 @@ export function SortableField({
     <div 
       ref={setNodeRef} 
       style={style}
-      className="relative"
+      {...attributes}
+      {...listeners}
+      suppressHydrationWarning
+      className={`relative ${isDragging ? 'border border-primary rounded-md' : ''}`}
+      data-dragging={isDragging ? "true" : "false"}
     >
       <div className="relative group">
         <FieldCard 
@@ -56,8 +60,6 @@ export function SortableField({
         />
         {/* Improved Drag handle */}
         <div 
-          {...attributes} 
-          {...listeners}
           className="absolute top-3 right-3 flex items-center justify-center w-8 h-8 rounded-md cursor-grab 
             active:cursor-grabbing text-muted-foreground hover:text-primary hover:bg-primary/5 
             transition-colors duration-200 opacity-60 group-hover:opacity-100"

@@ -12,6 +12,8 @@ export function getDefaultPlaceholder(type: FieldType): string {
   switch (type) {
     case "email":
       return "email@example.com";
+    case "url":
+      return "https://example.com";
     case "phone":
       return "Phone number";
     case "text":

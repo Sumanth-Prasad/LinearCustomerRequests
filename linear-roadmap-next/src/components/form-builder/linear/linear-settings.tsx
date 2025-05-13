@@ -3,12 +3,44 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { BadgeInput } from "../mentions/badge-input";
 import { LexicalBadgeEditor } from "@/components/LexicalBadgeEditor";
-import type { LinearIntegrationSettings, FieldMention } from "./types";
-import type { FormField } from "../core/types";
+import type { LinearIntegrationSettings, FieldMention, LinearPriority } from "./types";
+import type { FormField, FormSettings, FormType } from "../core/types";
+
+// Linear API types
+interface LinearTeam {
+  id: string;
+  name: string;
+  key: string;
+}
+
+interface LinearProject {
+  id: string;
+  name: string;
+  teamId: string;
+}
+
+interface LinearWorkflowState {
+  id: string;
+  name: string;
+  teamId: string;
+}
+
+interface LinearLabel {
+  id: string;
+  name: string;
+  color: string; // Hex color
+}
+
+interface LinearUser {
+  id: string;
+  name: string;
+  displayName: string;
+}
 
 interface LinearSettingsProps {
   linearSettings: LinearIntegrationSettings;
   setLinearSettings: React.Dispatch<React.SetStateAction<LinearIntegrationSettings>>;
+  formSettings: FormSettings;
   showLinearSettings: boolean;
   setShowLinearSettings: React.Dispatch<React.SetStateAction<boolean>>;
   mentions: Record<string, FieldMention[]>;
@@ -24,6 +56,7 @@ interface LinearSettingsProps {
 export function LinearSettings({
   linearSettings,
   setLinearSettings,
+  formSettings,
   showLinearSettings,
   setShowLinearSettings,
   mentions,
@@ -35,6 +68,180 @@ export function LinearSettings({
   inputRefs,
   fields
 }: LinearSettingsProps) {
+  // Loading states
+  const [isLoadingTeams, setIsLoadingTeams] = useState(false);
+  const [isLoadingProjects, setIsLoadingProjects] = useState(false);
+  const [isLoadingStates, setIsLoadingStates] = useState(false);
+  const [isLoadingLabels, setIsLoadingLabels] = useState(false);
+  const [isLoadingUsers, setIsLoadingUsers] = useState(false);
+  
+  // API data
+  const [teams, setTeams] = useState<LinearTeam[]>([]);
+  const [projects, setProjects] = useState<LinearProject[]>([]);
+  const [states, setStates] = useState<LinearWorkflowState[]>([]);
+  const [labels, setLabels] = useState<LinearLabel[]>([]);
+  const [users, setUsers] = useState<LinearUser[]>([]);
+  
+  // Search states
+  const [labelSearch, setLabelSearch] = useState('');
+  const [selectedLabels, setSelectedLabels] = useState<string[]>([]);
+  
+  // API functions - in a real app, these would call the actual Linear API
+  // We're mocking them for demonstration
+  const fetchTeams = async () => {
+    setIsLoadingTeams(true);
+    try {
+      const response = await fetch('/api/linear/teams');
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data: LinearTeam[] = await response.json();
+      setTeams(data);
+    } catch (error) {
+      console.error('Error fetching teams:', error);
+    } finally {
+      setIsLoadingTeams(false);
+    }
+  };
+  
+  const fetchProjects = async (teamId: string) => {
+    if (!teamId) return;
+    
+    setIsLoadingProjects(true);
+    try {
+      const response = await fetch(`/api/linear/teams/${teamId}/projects`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data: LinearProject[] = await response.json();
+      setProjects(data);
+    } catch (error) {
+      console.error('Error fetching projects:', error);
+    } finally {
+      setIsLoadingProjects(false);
+    }
+  };
+  
+  const fetchStates = async (teamId: string) => {
+    if (!teamId) return;
+    
+    setIsLoadingStates(true);
+    try {
+      const response = await fetch(`/api/linear/teams/${teamId}/states`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data: LinearWorkflowState[] = await response.json();
+      setStates(data);
+    } catch (error) {
+      console.error('Error fetching states:', error);
+    } finally {
+      setIsLoadingStates(false);
+    }
+  };
+  
+  const fetchLabels = async () => {
+    setIsLoadingLabels(true);
+    try {
+      const response = await fetch('/api/linear/labels');
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data: LinearLabel[] = await response.json();
+      setLabels(data);
+    } catch (error) {
+      console.error('Error fetching labels:', error);
+    } finally {
+      setIsLoadingLabels(false);
+    }
+  };
+  
+  const fetchUsers = async (teamId: string) => {
+    if (!teamId) return;
+    
+    setIsLoadingUsers(true);
+    try {
+      const response = await fetch(`/api/linear/teams/${teamId}/users`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data: LinearUser[] = await response.json();
+      setUsers(data);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+    } finally {
+      setIsLoadingUsers(false);
+    }
+  };
+  
+  // Load teams on initial render
+  useEffect(() => {
+    if (showLinearSettings) {
+      fetchTeams();
+      fetchLabels();
+    }
+  }, [showLinearSettings]);
+  
+  // Load dependent data when team changes
+  useEffect(() => {
+    if (linearSettings.team) {
+      fetchProjects(linearSettings.team);
+      fetchStates(linearSettings.team);
+      fetchUsers(linearSettings.team);
+    }
+  }, [linearSettings.team]);
+  
+  // Handle label selection
+  const handleAddLabel = (labelId: string) => {
+    const label = labels.find(l => l.id === labelId);
+    if (label && !selectedLabels.includes(labelId)) {
+      setSelectedLabels([...selectedLabels, labelId]);
+      setLinearSettings({
+        ...linearSettings,
+        labels: [...(linearSettings.labels || []), label.name]
+      });
+      setLabelSearch('');
+    }
+  };
+  
+  const handleRemoveLabel = (labelName: string) => {
+    const label = labels.find(l => l.name === labelName);
+    if (label) {
+      setSelectedLabels(selectedLabels.filter(id => id !== label.id));
+    }
+    // Always remove from settings even if label not in the fetched list
+    setLinearSettings({
+      ...linearSettings,
+      labels: (linearSettings.labels || []).filter(name => name !== labelName)
+    });
+  };
+
+  // Get priority display name
+  const getPriorityLabel = (priority?: LinearPriority): string => {
+    switch (priority) {
+      case 'urgent': return 'Urgent';
+      case 'high': return 'High';
+      case 'medium': return 'Medium';
+      case 'low': return 'Low';
+      case 'no_priority': return 'No Priority';
+      default: return 'No Priority';
+    }
+  };
+
+  // Get priority color
+  const getPriorityColor = (priority?: LinearPriority): string => {
+    switch (priority) {
+      case 'urgent': return '#F25353'; // Red
+      case 'high': return '#FF9F1A';   // Orange
+      case 'medium': return '#FFD600'; // Yellow
+      case 'low': return '#4894FE';    // Blue
+      case 'no_priority': 
+      default: return '#8E8E93';       // Gray
+    }
+  };
+
+  // Get form type label for Linear integration
+  const getFormTypeLabel = (type: FormType, customType?: string): string => {
+    switch (type) {
+      case 'bug': return 'Bug';
+      case 'feature': return 'Feature Request';
+      case 'feedback': return 'Feedback';
+      case 'question': return 'Question';
+      case 'custom': return customType || 'Custom Request';
+      default: return 'Request';
+    }
+  };
+
   // Markdown editing function
   const insertMarkdown = (pattern: string) => {
     const input = inputRefs.current.get('response_message');
@@ -138,89 +345,277 @@ export function LinearSettings({
             <label className="block mb-2 font-medium">Team</label>
             <select 
               value={linearSettings.team}
-              onChange={(e) => setLinearSettings({...linearSettings, team: e.target.value})}
+              onChange={(e) => setLinearSettings({...linearSettings, team: e.target.value, project: undefined, status: undefined})}
               className="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
+              disabled={isLoadingTeams}
             >
               <option value="">Select a team</option>
-              <option value="team1">Engineering</option>
-              <option value="team2">Product</option>
-              <option value="team3">Design</option>
+              {teams.map(team => (
+                <option key={team.id} value={team.id}>
+                  {team.name} ({team.key})
+                </option>
+              ))}
             </select>
-            <p className="text-xs text-muted-foreground mt-1">Teams will be loaded from Linear</p>
+            {isLoadingTeams ? (
+              <p className="text-xs text-muted-foreground mt-1">Loading teams...</p>
+            ) : (
+              <p className="text-xs text-muted-foreground mt-1">Choose a team to continue setup</p>
+            )}
           </div>
           
-          {/* Project field - added from form-builder.tsx */}
+          {/* Project field - now using real data */}
           <div>
             <label className="block mb-2 font-medium">Project (Optional)</label>
             <select 
               value={linearSettings.project || ''}
               onChange={(e) => setLinearSettings({...linearSettings, project: e.target.value || undefined})}
               className="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
+              disabled={isLoadingProjects || !linearSettings.team}
             >
               <option value="">No project</option>
-              <option value="project1">Website Redesign</option>
-              <option value="project2">Mobile App</option>
-              <option value="project3">API Integration</option>
+              {projects.map(project => (
+                <option key={project.id} value={project.id}>
+                  {project.name}
+                </option>
+              ))}
             </select>
-            <p className="text-xs text-muted-foreground mt-1">Projects will be loaded from Linear</p>
+            {!linearSettings.team ? (
+              <p className="text-xs text-muted-foreground mt-1">Select a team first</p>
+            ) : isLoadingProjects ? (
+              <p className="text-xs text-muted-foreground mt-1">Loading projects...</p>
+            ) : projects.length === 0 ? (
+              <p className="text-xs text-muted-foreground mt-1">No projects available for this team</p>
+            ) : (
+              <p className="text-xs text-muted-foreground mt-1">Select a project (optional)</p>
+            )}
           </div>
           
-          {/* Initial Status field - added from form-builder.tsx */}
+          {/* Initial Status field - now using real data */}
           <div>
             <label className="block mb-2 font-medium">Initial Status (Optional)</label>
             <select 
               value={linearSettings.status || ''}
               onChange={(e) => setLinearSettings({...linearSettings, status: e.target.value || undefined})}
               className="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
+              disabled={isLoadingStates || !linearSettings.team}
             >
               <option value="">Default status</option>
-              <option value="status1">Backlog</option>
-              <option value="status2">Todo</option>
-              <option value="status3">In Progress</option>
+              {states.map(state => (
+                <option key={state.id} value={state.id}>
+                  {state.name}
+                </option>
+              ))}
             </select>
-            <p className="text-xs text-muted-foreground mt-1">Statuses will be loaded from Linear</p>
+            {!linearSettings.team ? (
+              <p className="text-xs text-muted-foreground mt-1">Select a team first</p>
+            ) : isLoadingStates ? (
+              <p className="text-xs text-muted-foreground mt-1">Loading statuses...</p>
+            ) : states.length === 0 ? (
+              <p className="text-xs text-muted-foreground mt-1">No statuses available for this team</p>
+            ) : (
+              <p className="text-xs text-muted-foreground mt-1">Select a status (optional)</p>
+            )}
           </div>
           
-          {/* Labels field - added from form-builder.tsx */}
+          {/* Labels field - now using real data */}
           <div>
             <label className="block mb-2 font-medium">Labels (Optional)</label>
             <div className="border rounded-md p-2 bg-background">
-              <div className="flex flex-wrap gap-2 mb-2">
-                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100">
-                  Customer Request
-                  <button type="button" className="ml-1 inline-flex items-center justify-center">
+              {/* Selected labels */}
+              <div className="flex flex-wrap gap-2 mb-2 min-h-[32px]">
+                {linearSettings.labels && linearSettings.labels.map((label, index) => {
+                  const labelObj = labels.find(l => l.name === label);
+                  const labelColor = labelObj?.color || '#888888';
+                  return (
+                    <span 
+                      key={index} 
+                      className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium"
+                      style={{ 
+                        backgroundColor: `${labelColor}20`, // 20% opacity
+                        color: labelColor,
+                        borderColor: labelColor
+                      }}
+                    >
+                      {label}
+                      <button 
+                        type="button" 
+                        className="ml-1 inline-flex items-center justify-center"
+                        onClick={() => handleRemoveLabel(label)}
+                      >
                     <span className="sr-only">Remove</span>
                     <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
                     </svg>
                   </button>
                 </span>
+                  );
+                })}
               </div>
-              <div className="flex items-center border-t pt-2">
+
+              {/* Common labels grid */}
+              <div className="border-t pt-3 pb-2">
+                <div className="text-sm font-medium mb-2">Common labels</div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                  {!isLoadingLabels && labels
+                    .slice(0, 8) // Show first 8 labels as quick options
+                    .map(label => {
+                      const isSelected = linearSettings.labels?.includes(label.name) || false;
+                      return (
+                        <div 
+                          key={label.id} 
+                          className={`flex items-center p-1.5 rounded border cursor-pointer
+                            ${isSelected 
+                              ? 'bg-primary/10 border-primary' 
+                              : 'hover:bg-muted border-border hover:border-primary/30'
+                            }`}
+                          onClick={() => isSelected 
+                            ? handleRemoveLabel(label.name) 
+                            : handleAddLabel(label.id)
+                          }
+                        >
+                          <span 
+                            className="w-3 h-3 rounded-full mr-2 flex-shrink-0"
+                            style={{ backgroundColor: label.color }}
+                          ></span>
+                          <span className="text-xs truncate">{label.name}</span>
+                        </div>
+                      );
+                    })
+                  }
+                  {isLoadingLabels && Array(8).fill(0).map((_, i) => (
+                    <div key={i} className="animate-pulse flex items-center p-1.5 rounded border border-border">
+                      <div className="w-3 h-3 rounded-full mr-2 bg-muted"></div>
+                      <div className="h-3 bg-muted rounded w-3/4"></div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              
+              {/* Search for more labels */}
+              <div className="border-t pt-3">
+                <div className="text-sm font-medium mb-2">Search for more</div>
+                <div className="flex items-center">
+                  <div className="relative flex-1">
                 <input 
                   type="text" 
-                  className="flex-1 p-1 bg-background border-0 focus:ring-0 text-sm text-foreground" 
-                  placeholder="Search and add labels..."
-                />
+                      className="w-full p-1.5 pl-7 bg-background text-sm border rounded" 
+                      placeholder="Search labels..."
+                      value={labelSearch}
+                      onChange={(e) => setLabelSearch(e.target.value)}
+                      disabled={isLoadingLabels}
+                    />
+                    <svg 
+                      xmlns="http://www.w3.org/2000/svg" 
+                      width="16" 
+                      height="16" 
+                      viewBox="0 0 24 24" 
+                      fill="none" 
+                      stroke="currentColor" 
+                      strokeWidth="2" 
+                      strokeLinecap="round" 
+                      strokeLinejoin="round" 
+                      className="absolute left-2 top-1/2 transform -translate-y-1/2 text-muted-foreground"
+                    >
+                      <circle cx="11" cy="11" r="8"></circle>
+                      <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
+                  </div>
+                </div>
+                
+                {/* Search results */}
+                {labelSearch.length > 0 && (
+                  <div className="mt-2 max-h-32 overflow-y-auto border border-border rounded">
+                    {labels
+                      .filter(label => 
+                        label.name.toLowerCase().includes(labelSearch.toLowerCase()) &&
+                        !linearSettings.labels?.includes(label.name)
+                      )
+                      .map(label => (
+                        <div 
+                          key={label.id} 
+                          className="px-2 py-1.5 hover:bg-muted cursor-pointer flex items-center"
+                          onClick={() => handleAddLabel(label.id)}
+                        >
+                          <span 
+                            className="w-3 h-3 rounded-full mr-2 flex-shrink-0"
+                            style={{ backgroundColor: label.color }}
+                          ></span>
+                          <span className="text-sm">{label.name}</span>
+                        </div>
+                      ))}
+                      {labels.filter(label => 
+                        label.name.toLowerCase().includes(labelSearch.toLowerCase()) &&
+                        !linearSettings.labels?.includes(label.name)
+                      ).length === 0 && (
+                        <div className="px-2 py-1.5 text-muted-foreground text-sm">
+                          No matching labels found
+                        </div>
+                      )}
+                  </div>
+                )}
               </div>
             </div>
-            <p className="text-xs text-muted-foreground mt-1">Labels will be loaded from Linear</p>
+            {isLoadingLabels ? (
+              <p className="text-xs text-muted-foreground mt-1">Loading labels...</p>
+            ) : (
+              <p className="text-xs text-muted-foreground mt-1">Select common labels or search for more</p>
+            )}
           </div>
           
-          {/* Default Assignee field - added from form-builder.tsx */}
+          {/* Default Assignee field - now using real data */}
           <div>
             <label className="block mb-2 font-medium">Default Assignee (Optional)</label>
             <select 
               value={linearSettings.assignee || ''}
               onChange={(e) => setLinearSettings({...linearSettings, assignee: e.target.value || undefined})}
               className="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
+              disabled={isLoadingUsers || !linearSettings.team}
             >
               <option value="">Unassigned</option>
               <option value="me">Me (Current User)</option>
-              <option value="user1">John Doe</option>
-              <option value="user2">Jane Smith</option>
+              {users.map(user => (
+                <option key={user.id} value={user.id}>
+                  {user.name} (@{user.displayName})
+                </option>
+              ))}
             </select>
-            <p className="text-xs text-muted-foreground mt-1">Team members will be loaded from Linear</p>
+            {!linearSettings.team ? (
+              <p className="text-xs text-muted-foreground mt-1">Select a team first</p>
+            ) : isLoadingUsers ? (
+              <p className="text-xs text-muted-foreground mt-1">Loading team members...</p>
+            ) : users.length === 0 ? (
+              <p className="text-xs text-muted-foreground mt-1">No team members available</p>
+            ) : (
+              <p className="text-xs text-muted-foreground mt-1">Select an assignee (optional)</p>
+            )}
+          </div>
+          
+          {/* Priority field - based on Linear API docs */}
+          <div>
+            <label className="block mb-2 font-medium">Default Priority</label>
+            <div className="grid grid-cols-5 gap-2">
+              {(['no_priority', 'low', 'medium', 'high', 'urgent'] as LinearPriority[]).map((priority) => (
+                <button
+                  key={priority}
+                  type="button"
+                  onClick={() => setLinearSettings({...linearSettings, priority})}
+                  className={`p-2 flex flex-col items-center justify-center border rounded-md 
+                    ${linearSettings.priority === priority 
+                      ? 'border-primary bg-primary/10 ring-1 ring-primary shadow-sm' 
+                      : 'border-border hover:border-primary/50 hover:bg-muted/40'}
+                  `}
+                >
+                  <div 
+                    className="w-6 h-6 rounded-full mb-2 flex-shrink-0"
+                    style={{ backgroundColor: getPriorityColor(priority) }}
+                  ></div>
+                  <span className={`text-xs ${linearSettings.priority === priority ? 'font-medium' : ''}`}>
+                    {getPriorityLabel(priority)}
+                  </span>
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">Sets the default priority for issues created from this form</p>
           </div>
           
           {/* Title field with mentions support */}
@@ -257,50 +652,12 @@ export function LinearSettings({
               className="border border-border rounded-md p-2 bg-background text-foreground min-h-[250px]"
               fieldId="response_message"
               isMarkdown={true}
+              disableMarkdownShortcuts={false}
             />
             <p className="text-xs text-muted-foreground mt-1">
               Shown to users after form submission. Type @ to reference form fields. Supports markdown formatting.
               Try typing # for headings, * for lists, {'>'} for quotes, ** for bold, * for italic.
             </p>
-            
-            {/* Markdown syntax help */}
-            <details className="mt-2 text-xs text-muted-foreground border border-border rounded-md p-2">
-              <summary className="cursor-pointer font-medium">Markdown Syntax Help</summary>
-              <div className="mt-2 grid grid-cols-2 gap-2">
-                <div>
-                  <h4 className="font-medium">Headings</h4>
-                  <pre className="bg-gray-100 dark:bg-gray-800 p-1 rounded">
-                    # Heading 1{'\n'}
-                    ## Heading 2{'\n'}
-                    ### Heading 3
-                  </pre>
-                </div>
-                <div>
-                  <h4 className="font-medium">Formatting</h4>
-                  <pre className="bg-gray-100 dark:bg-gray-800 p-1 rounded">
-                    **Bold Text**{'\n'}
-                    *Italic Text*{'\n'}
-                    ~~Strikethrough~~
-                  </pre>
-                </div>
-                <div>
-                  <h4 className="font-medium">Lists</h4>
-                  <pre className="bg-gray-100 dark:bg-gray-800 p-1 rounded">
-                    * Unordered list item{'\n'}
-                    1. Ordered list item{'\n'}
-                    2. Another item
-                  </pre>
-                </div>
-                <div>
-                  <h4 className="font-medium">Other</h4>
-                  <pre className="bg-gray-100 dark:bg-gray-800 p-1 rounded">
-                    {'>'} Blockquote{'\n'}
-                    `inline code`{'\n'}
-                    [Link text](URL)
-                  </pre>
-                </div>
-              </div>
-            </details>
           </div>
           
           <div className="flex items-center">
@@ -343,6 +700,8 @@ export function LinearSettings({
               </svg>
             </div>
           </div>
+          
+          {/* Status preview removed as requested */}
         </div>
       )}
     </div>

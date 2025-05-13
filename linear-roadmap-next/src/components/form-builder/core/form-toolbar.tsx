@@ -26,6 +26,7 @@ export function FormToolbar({
         >
           <option value="text">Text</option>
           <option value="email">Email</option>
+          <option value="url">URL</option>
           <option value="phone">Phone Number</option>
           <option value="textarea">Text Area</option>
           <option value="select">Dropdown</option>

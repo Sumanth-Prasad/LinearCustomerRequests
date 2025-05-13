@@ -2,6 +2,8 @@
 
 import React from 'react';
 import { FormField, FieldMention } from './types';
+import { Mail, Link } from "lucide-react";
+import { getCountryCallingCode } from 'react-phone-number-input/input';
 
 interface FieldCardProps {
   field: FormField;
@@ -24,14 +26,43 @@ export function FieldCard({
   const renderFieldPreview = () => {
     switch (field.type) {
       case "text":
-      case "email":
         return (
           <input
-            type={field.type}
+            type="text"
             placeholder={field.placeholder}
             className="w-full px-3 py-2 border border-border rounded bg-input"
             readOnly
           />
+        );
+      
+      case "email":
+        return (
+          <div className="relative">
+            <div className="absolute top-0 bottom-0 left-0 pl-3 flex items-center pointer-events-none">
+              <Mail className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <input
+              type="email"
+              placeholder={field.placeholder}
+              className="w-full pl-10 py-2 border border-border rounded bg-input"
+              readOnly
+            />
+          </div>
+        );
+      
+      case "url":
+        return (
+          <div className="relative">
+            <div className="absolute top-0 bottom-0 left-0 pl-3 flex items-center pointer-events-none">
+              <Link className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <input
+              type="url"
+              placeholder={field.placeholder || "https://example.com"}
+              className="w-full pl-10 py-2 border border-border rounded bg-input"
+              readOnly
+            />
+          </div>
         );
       
       case "textarea":
@@ -45,10 +76,10 @@ export function FieldCard({
         
       case "select":
         return (
-          <select className="w-full px-3 py-2 border border-border rounded bg-input">
-            <option value="">{field.placeholder || "Select an option"}</option>
+          <select className="w-full px-3 py-2 border border-border rounded bg-input text-foreground">
+            <option value="" className="text-foreground bg-input">{field.placeholder || "Select an option"}</option>
             {field.options?.map((option, index) => (
-              <option key={index} value={option}>
+              <option key={index} value={option} className="text-foreground bg-input">
                 {highlightMentions(option)}
               </option>
             ))}
@@ -77,10 +108,29 @@ export function FieldCard({
         );
         
       case "phone":
+        // Get country code for flag
+        const countryCode = field.countryCode || "US";
+        
+        // Get calling code
+        let callingCode;
+        try {
+          callingCode = getCountryCallingCode(countryCode);
+        } catch (e) {
+          callingCode = "1"; // Default to US if code not found
+        }
+        
         return (
           <div className="flex">
-            <div className="bg-muted px-3 py-2 border border-r-0 border-border rounded-l text-sm text-muted-foreground">
-              {field.countryCode || "+1"}
+            <div className="bg-muted px-3 py-2 border border-r-0 border-border rounded-l text-sm text-muted-foreground flex items-center gap-1">
+              <img 
+                src={`https://flagcdn.com/16x12/${countryCode.toLowerCase()}.png`}
+                srcSet={`https://flagcdn.com/32x24/${countryCode.toLowerCase()}.png 2x, https://flagcdn.com/48x36/${countryCode.toLowerCase()}.png 3x`}
+                width="16" 
+                height="12" 
+                alt={countryCode}
+                className="inline-block object-cover"
+              />
+              <span>+{callingCode}</span>
             </div>
             <input
               type="tel"
@@ -121,8 +171,9 @@ export function FieldCard({
     <div 
       className={`p-4 border rounded transition-colors ${
         isActive ? 'border-primary bg-primary/5' : 'border-border hover:border-muted-foreground/20 bg-card'
-      }`}
+      } opacity-100`}
       onClick={onActive}
+      style={{ opacity: 1 }}
     >
       <div className="flex justify-between items-start mb-2">
         <div className="flex items-center gap-2">
@@ -131,9 +182,10 @@ export function FieldCard({
             {field.required && <span className="text-destructive ml-1">*</span>}
           </h4>
         </div>
-        <div className="px-2 py-1 rounded bg-muted text-xs text-muted-foreground">
+        {/* Field type label - hide it */}
+        {/* <div className="px-2 py-1 rounded bg-muted text-xs text-muted-foreground">
           {field.type}
-        </div>
+        </div> */}
       </div>
       
       {renderFieldPreview()}

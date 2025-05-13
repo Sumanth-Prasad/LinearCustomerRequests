@@ -2,7 +2,7 @@
 
 import React from "react";
 import { FormField } from "../core/types";
-import { Mail } from "lucide-react";
+import { Mail, Link } from "lucide-react";
 import { getCountries, getCountryCallingCode } from 'react-phone-number-input/input';
 import en from 'react-phone-number-input/locale/en.json';
 import { LexicalBadgeEditor } from "@/components/LexicalBadgeEditor";
@@ -102,6 +102,31 @@ export function FieldEditor({
                       ? 'border-green-500 focus:border-green-500 focus:ring-green-500/50'
                       : 'focus:border-primary border-border'
                 }`}
+              />
+            </div>
+          </div>
+        )}
+        
+        {/* URL Field */}
+        {field.type === "url" && (
+          <div>
+            <label className="block mb-2 font-medium">Placeholder</label>
+            <div className="relative">
+              <div className="absolute top-0 bottom-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Link className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <input 
+                type="url" 
+                value={field.placeholder || ""} 
+                onChange={(e) => handleInputChange(e, field.id)}
+                ref={(el) => {
+                  if (el) {
+                    inputRefs.current.set(field.id, el);
+                  } else {
+                    inputRefs.current.delete(field.id);
+                  }
+                }}
+                className="w-full pl-10 p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
               />
             </div>
           </div>
