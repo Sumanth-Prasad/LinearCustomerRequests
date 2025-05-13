@@ -14,6 +14,7 @@ import { updateMentionPositions, processMentionSelection } from "../mentions/men
 import { getDefaultPlaceholder, createNewField } from "../utils/field-utils";
 import { updateField, removeField as removeFieldOp, addOption, removeOption, updateOption } from "../utils/field-operations";
 import type { FieldType, FormField, FieldMention, MentionMenuState, LinearIntegrationSettings } from "./types";
+import { LexicalBadgeEditor } from "@/components/LexicalBadgeEditor";
 
 // Add the global declaration for our helper methods
 declare global {
@@ -613,6 +614,7 @@ export default function FormBuilder() {
         handleKeyDown={handleKeyDown}
         handleRemoveMention={handleRemoveMention}
         inputRefs={inputRefs}
+        fields={fields}
       />
 
       {/* Mention popup (shadcn Combobox) */}

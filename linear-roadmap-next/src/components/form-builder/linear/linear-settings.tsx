@@ -2,7 +2,9 @@
 
 import React from "react";
 import { BadgeInput } from "../mentions/badge-input";
+import { LexicalBadgeEditor } from "@/components/LexicalBadgeEditor";
 import type { LinearIntegrationSettings, FieldMention } from "./types";
+import type { FormField } from "../core/types";
 
 interface LinearSettingsProps {
   linearSettings: LinearIntegrationSettings;
@@ -16,6 +18,7 @@ interface LinearSettingsProps {
   handleKeyDown: (e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>, fieldId: string) => void;
   handleRemoveMention: (fieldId: string, mentionId: string, mentionStartPos: number, mentionEndPos: number) => void;
   inputRefs: React.MutableRefObject<Map<string, HTMLInputElement | HTMLTextAreaElement>>;
+  fields: FormField[];
 }
 
 export function LinearSettings({
@@ -29,7 +32,8 @@ export function LinearSettings({
   handleInputChange,
   handleKeyDown,
   handleRemoveMention,
-  inputRefs
+  inputRefs,
+  fields
 }: LinearSettingsProps) {
   // Markdown editing function
   const insertMarkdown = (pattern: string) => {
@@ -242,95 +246,19 @@ export function LinearSettings({
             <p className="text-xs text-muted-foreground mt-1">Use {'{title}'} to include the submitted title. Type @ to reference form fields.</p>
           </div>
           
-          {/* Response message field with mentions support and markdown toolbar */}
+          {/* Response message field with Lexical editor and badge support */}
           <div>
             <label className="block mb-2 font-medium">Response Message</label>
-            <div className="relative border rounded-md overflow-hidden border-border">
-              {/* Markdown toolbar */}
-              <div className="flex gap-1 border-b border-border bg-muted dark:bg-background p-1">
-                <button 
-                  type="button"
-                  onClick={() => insertMarkdown('**')}
-                  className="p-1 rounded hover:bg-accent hover:text-accent-foreground text-foreground" 
-                  title="Bold"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.5 10.5H21M13.5 6.5H21M3 10.5H7.5C9 10.5 10.5 9 10.5 7.5C10.5 6 9 4.5 7.5 4.5H3v6M3 19.5h4.5c1.5 0 3-1.5 3-3 0-1.5-1.5-3-3-3H3v6z"></path>
-                  </svg>
-                </button>
-                <button 
-                  type="button"
-                  onClick={() => insertMarkdown('*')}
-                  className="p-1 rounded hover:bg-accent hover:text-accent-foreground text-foreground" 
-                  title="Italic"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 4.5h3m4 0h-3m-4 15h3m4 0h-3m-7-7.5L14 4.5m0 15L7 12"></path>
-                  </svg>
-                </button>
-                <div className="h-full w-px bg-border mx-1"></div>
-                <button 
-                  type="button"
-                  onClick={() => insertMarkdown('- ')}
-                  className="p-1 rounded hover:bg-accent hover:text-accent-foreground text-foreground" 
-                  title="Bulleted List"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 6h13M8 12h13M8 18h7"></path>
-                  </svg>
-                </button>
-                <button 
-                  type="button"
-                  onClick={() => insertMarkdown('1. ')}
-                  className="p-1 rounded hover:bg-accent hover:text-accent-foreground text-foreground" 
-                  title="Numbered List"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 12.5h10.5m-10.5-6h10.5m-10.5 12h10.5M3 18.5v-3l-1 1v-1l1-1v-3m2 1v-1l-2 2v-1l2-2v-1m0-2v-1l-2 2v-1l2-2v-1"></path>
-                  </svg>
-                </button>
-                <div className="h-full w-px bg-border mx-1"></div>
-                <button 
-                  type="button"
-                  onClick={() => insertMarkdown('[](url)')}
-                  className="p-1 rounded hover:bg-accent hover:text-accent-foreground text-foreground" 
-                  title="Link"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
-                  </svg>
-                </button>
-                <button 
-                  type="button"
-                  onClick={() => insertMarkdown('# ')}
-                  className="p-1 rounded hover:bg-accent hover:text-accent-foreground text-foreground" 
-                  title="Heading"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 12h12m-6-6v12"></path>
-                  </svg>
-                </button>
-              </div>
-              <BadgeInput
+            <LexicalBadgeEditor
+              value={linearSettings.responseMessage}
+              onChange={(v) => setLinearSettings({...linearSettings, responseMessage: v})}
+              fields={fields}
+              placeholder="Enter response message..."
+              className="border border-border rounded-md p-2 bg-background text-foreground"
                 fieldId="response_message"
-                value={linearSettings.responseMessage}
-                mentions={mentions['response_message'] || []}
-                InputComponent="textarea"
-                inputProps={{
-                  id: 'response_message',
-                  placeholder: 'Enter response message...',
-                  className: 'w-full p-2 border-0 focus:outline-none h-32',
-                  value: linearSettings.responseMessage
-                }}
-                onInputChange={handleInputChange}
-                onKeyDown={handleKeyDown}
-                onRemoveMention={handleRemoveMention}
-                inputRefs={inputRefs}
-              />
-            </div>
+            />
             <p className="text-xs text-muted-foreground mt-1">
               Shown to users after form submission. Type @ to reference form fields.
-              Supports Markdown formatting.
             </p>
           </div>
           

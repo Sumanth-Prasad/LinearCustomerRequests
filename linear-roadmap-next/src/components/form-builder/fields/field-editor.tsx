@@ -1,10 +1,11 @@
 "use client";
 
 import React from "react";
-import { FormField } from "./types";
+import { FormField } from "../core/types";
 import { Mail } from "lucide-react";
 import { getCountries, getCountryCallingCode } from 'react-phone-number-input/input';
 import en from 'react-phone-number-input/locale/en.json';
+import { LexicalBadgeEditor } from "@/components/LexicalBadgeEditor";
 
 interface FieldEditorProps {
   activeField: string | null;
@@ -62,35 +63,14 @@ export function FieldEditor({
         {(field.type === "text" || field.type === "textarea") && (
           <div>
             <label className="block mb-2 font-medium">Placeholder</label>
-            {field.type === "textarea" ? (
-              <textarea 
-                value={field.placeholder || ""} 
-                onChange={(e) => handleInputChange(e, field.id)}
-                ref={(el) => {
-                  if (el) {
-                    inputRefs.current.set(field.id, el);
-                  } else {
-                    inputRefs.current.delete(field.id);
-                  }
-                }}
-                rows={3}
-                className="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
-              />
-            ) : (
-              <input 
-                type="text" 
-                value={field.placeholder || ""} 
-                onChange={(e) => handleInputChange(e, field.id)}
-                ref={(el) => {
-                  if (el) {
-                    inputRefs.current.set(field.id, el);
-                  } else {
-                    inputRefs.current.delete(field.id);
-                  }
-                }}
-                className="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary bg-background text-foreground"
-              />
-            )}
+            <LexicalBadgeEditor
+              value={field.placeholder || ""}
+              onChange={(v) => onUpdateField(field.id, { placeholder: v })}
+              fields={fields}
+              placeholder="Type @ to reference other fields"
+              className="border rounded-md p-2 bg-background text-foreground"
+              fieldId={field.id}
+            />
             <p className="text-xs text-muted-foreground mt-1">Type @ to reference other fields</p>
           </div>
         )}
