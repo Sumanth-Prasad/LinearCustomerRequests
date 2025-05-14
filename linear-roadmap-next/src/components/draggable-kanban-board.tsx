@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
+import { KanbanHeader } from "@/components/ui/shadcn-io/kanban";
 
 interface KanbanState {
   id: string;
@@ -115,27 +116,27 @@ export function DraggableKanbanBoard({
   // Render the issue card directly in the client component
   const renderIssueCard = (issue: KanbanIssue) => (
     <div 
-      style={{ width: '350px' }}
-      className="bg-card rounded-md shadow border border-border hover:shadow-md transition-shadow h-[120px] relative"
+      style={{ width: '300px' }}
+      className="bg-card rounded-md shadow border border-border hover:shadow-md transition-shadow h-[100px] relative"
     >
       <Link href={`/issue/${issue.id}`} className="block p-4 h-full w-full flex flex-col">
         <div className="flex justify-between items-start w-full mb-3">
           <div className="flex-1 overflow-hidden">
-            <h3 className="font-medium text-base text-foreground line-clamp-2 pr-3">
+            <h3 className="font-medium text-sm text-foreground line-clamp-2 pr-2">
               {issue.title}
             </h3>
           </div>
           
           <div className="pl-6 flex-shrink-0">
             {[1,2,3,4].includes(issue.priority ?? -1) && (
-              <span className="text-xs font-semibold text-white whitespace-nowrap inline-block"
+              <span className="text-[10px] font-semibold text-white whitespace-nowrap inline-block"
               style={{
                 backgroundColor: issue.priority === 1 ? "#ef4444" :
                   issue.priority === 2 ? "#f97316" :
                   issue.priority === 3 ? "#eab308" :
                   issue.priority === 4 ? "#6b7280" : "#d1d5db",
-                padding: "0.25rem 0.5rem",
-                borderRadius: "0.25rem"
+                padding: "0.15rem 0.4rem",
+                borderRadius: "0.2rem"
               }}>
                 {issue.priority === 1 ? "Urgent" : 
                  issue.priority === 2 ? "High" :
@@ -154,7 +155,7 @@ export function DraggableKanbanBoard({
                 {issue.labels.map((label, index) => (
                   <span 
                     key={index}
-                    className="text-xs font-medium px-2 py-0.5 rounded-full truncate"
+                    className="text-[10px] font-medium px-1.5 py-0.5 rounded-full truncate"
                     style={{ 
                       backgroundColor: label.color || '#6b7280',
                       color: 'white'
@@ -170,7 +171,7 @@ export function DraggableKanbanBoard({
           {/* Assignee section - moved back to bottom right */}
           {issue.assignee && (
             <div className="flex items-center gap-1 ml-2 flex-shrink-0">
-              <div className="w-5 h-5 rounded-full bg-primary-foreground flex items-center justify-center text-xs overflow-hidden">
+              <div className="w-4 h-4 rounded-full bg-primary-foreground flex items-center justify-center text-[10px] overflow-hidden">
                 {issue.assignee.avatarUrl ? (
                   <img 
                     src={issue.assignee.avatarUrl} 
@@ -194,11 +195,11 @@ export function DraggableKanbanBoard({
   return (
     <div
       ref={boardRef}
-      className={`flex gap-6 overflow-x-auto pb-6 ${isCursorGrabbing ? "cursor-grabbing" : "cursor-grab"}`}
-      style={{ 
+      className={`overflow-x-auto pb-6 ${isCursorGrabbing ? "cursor-grabbing" : "cursor-grab"}`}
+      style={{
         scrollBehavior: isDragging ? "auto" : "smooth",
         scrollbarWidth: "none", // Firefox
-        msOverflowStyle: "none" // IE/Edge
+        msOverflowStyle: "none", // IE/Edge
       }}
       onMouseDown={handleMouseDown}
       onMouseUp={handleMouseUp}
@@ -215,50 +216,31 @@ export function DraggableKanbanBoard({
           display: none;
         }
       `}</style>
-      
-      {workflowStates.map((state) => (
-        <div 
-          key={state.id} 
-          style={{ 
-            width: '350px', 
-            minWidth: '350px', 
-            maxWidth: '350px',
-            flexShrink: 0,
-            flexGrow: 0
-          }}
-        >
-          <div className="flex items-center gap-2 mb-4">
-            <div 
-              className="w-3 h-3 rounded-full" 
-              style={{ 
-                backgroundColor: state.color,
-                opacity: 1
-              }}
-            />
-            <h2 className="text-lg font-bold text-foreground">{state.name}</h2>
-            <span className="ml-auto text-sm text-muted-foreground">
-              {issuesByState[state.id]?.length || 0}
-            </span>
-          </div>
-          
-          <div className="space-y-4 min-h-[400px]" style={{ width: '350px' }}>
-            {issuesByState[state.id]?.map((issue) => (
-              <div key={issue.id}>
-                {renderIssueCard(issue)}
+
+      <div className="flex gap-6">
+        {workflowStates.map((state) => (
+          <div
+            key={state.id}
+            className="w-[300px] min-w-[300px] max-w-[300px] flex-shrink-0"
+          >
+            <div className="bg-muted/5 rounded-md p-2 h-full min-h-[350px] flex flex-col">
+              <KanbanHeader name={state.name} color={state.color || "#6b7280"} className="mb-3" />
+
+              <div className="flex flex-col gap-2 flex-1">
+                {issuesByState[state.id]?.map((issue) => (
+                  <div key={issue.id}>{renderIssueCard(issue)}</div>
+                ))}
+
+                {(!issuesByState[state.id] || issuesByState[state.id].length === 0) && (
+                  <div className="h-[100px] flex items-center justify-center text-muted-foreground text-xs border border-dashed rounded-md" style={{ width: '300px' }}>
+                    No issues
+                  </div>
+                )}
               </div>
-            ))}
-            
-            {(!issuesByState[state.id] || issuesByState[state.id].length === 0) && (
-              <div 
-                style={{ width: '350px' }}
-                className="h-[120px] p-4 flex items-center justify-center text-muted-foreground text-sm border border-dashed rounded-md"
-              >
-                No issues
-              </div>
-            )}
+            </div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 } 

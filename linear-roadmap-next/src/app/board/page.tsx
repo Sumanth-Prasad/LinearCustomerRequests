@@ -1,13 +1,10 @@
 import React from "react";
-import { Card } from "@/components/ui/card";
 import Link from "next/link";
 import { getLinearClient, safeGraphQLQuery } from "@/lib/linear";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { LabelBadge } from "@/components/custom-label-badge";
 import { DraggableKanbanBoard } from "@/components/draggable-kanban-board";
-import { FormSubmitDialog } from "@/components/form-submit-dialog";
 import { FloatingForm } from "@/components/floating-form";
+import IssueListView from "@/components/issue-list-view";
+import { BoardFilterControls } from "@/components/board-filter-controls";
 
 /*--------------------------------------------------------------------
   NOTE: This component is a direct copy of the previous /roadmap page
@@ -41,18 +38,20 @@ type User = { id: string; name: string; email: string; avatarUrl?: string };
 
 // --- Helpers -----------------------------------------------------------------
 
+interface WorkflowStateFetched { id: string; name: string; color?: string; position: number; type?: string; }
+
 async function fetchWorkflowStates(teamId: string) {
   try {
     const client = getLinearClient();
     const query = `
       query GetWorkflowStates($teamId: String!) {
         team(id: $teamId) {
-          states { nodes { id name color position } }
+          states { nodes { id name color position type } }
         }
       }
     `;
     const data = await safeGraphQLQuery<{
-      team?: { states?: { nodes: Array<{ id: string; name: string; color?: string; position: number }> } };
+      team?: { states?: { nodes: WorkflowStateFetched[] } };
     }>(client, query, { teamId }, { team: { states: { nodes: [] } } });
     const nodes = data?.team?.states?.nodes || [];
     return nodes.sort((a, b) => a.position - b.position);
@@ -121,27 +120,32 @@ async function fetchUsers(teamId: string) {
   }
 }
 
-async function fetchIssues(teamId: string, projectId?: string, filterCat?: string, filterVal?: string): Promise<Issue[]> {
+async function fetchIssues(teamId: string, projectId: string | undefined, statusList: string[], priority: string, label: string, assignee: string): Promise<Issue[]> {
   try {
     const client = getLinearClient();
     const filter: any = { team: { id: { eq: teamId } } };
     if (projectId && projectId !== "undefined") filter.project = { id: { eq: projectId } };
-    if (filterCat && filterCat !== "all" && filterVal && filterVal !== "all") {
-      if (filterCat === "status") {
-        if (filterVal === "unassigned") filter.assignee = { null: { eq: true } };
-        else filter.state = { name: { eq: filterVal } };
-      } else if (filterCat === "priority") {
+    if (statusList.length && !statusList.includes("all")) {
+      if (statusList.length === 1) {
+        filter.state = { name: { eq: statusList[0] } };
+      } else {
+        filter.state = { name: { in: statusList } };
+      }
+    }
+    if (priority && priority !== "all") {
         const map: Record<string, number> = { urgent: 1, high: 2, medium: 3, low: 4, none: 0 };
-        if (map[filterVal] !== undefined) filter.priority = { eq: map[filterVal] };
-      } else if (filterCat === "label") {
-        filter.labels = { name: { eq: filterVal } };
-      } else if (filterCat === "assignee") {
-        if (filterVal === "unassigned") filter.assignee = { null: { eq: true } };
-        else {
-          const users = await fetchUsers(teamId);
-          const u = users.find((x) => x.name === filterVal);
+      if (map[priority] !== undefined) filter.priority = { eq: map[priority] };
+    }
+    if (label && label !== "all") {
+      filter.labels = { name: { eq: label } };
+    }
+    if (assignee && assignee !== "all") {
+      if (assignee === "unassigned") {
+        filter.assignee = { null: true };
+      } else {
+        const users = await fetchUsers(teamId);
+        const u = users.find((x) => x.name === assignee);
           if (u) filter.assignee = { id: { eq: u.id } };
-        }
       }
     }
 
@@ -193,8 +197,11 @@ export default async function BoardPage({ searchParams }: { searchParams: Promis
 
   const projectId = params.project_id;
   const view = params.view || "kanban";
-  const filterCat = params.filter_category || "all";
-  const filterVal = params.filter_value || "all";
+  const statusParamRaw = (params as any).status || "all";
+  const statusParamArr = typeof statusParamRaw === "string" ? statusParamRaw.split(",").filter(Boolean) : ["all"];
+  const priorityParam = (params as any).priority || "all";
+  const labelParam = (params as any).label || "all";
+  const assigneeParam = (params as any).assignee || "all";
 
   if (!teamId) {
     return (
@@ -212,7 +219,7 @@ export default async function BoardPage({ searchParams }: { searchParams: Promis
     fetchWorkflowStates(teamId),
     fetchAllLabelTypes(teamId),
     fetchPriorities(),
-    fetchIssues(teamId, projectId, filterCat, filterVal),
+    fetchIssues(teamId, projectId, statusParamArr, priorityParam, labelParam, assigneeParam),
     fetchUsers(teamId),
   ]);
 
@@ -223,8 +230,60 @@ export default async function BoardPage({ searchParams }: { searchParams: Promis
     else if (states.length) issuesByState[states[0].id].push(i);
   });
 
+  // Custom status ordering - using Linear's built-in type field
+  // Order: Triage > Backlog > Todo > In Progress > Completed > Canceled 
+  const typeOrderMap = new Map([
+    ["triage", 0],
+    ["backlog", 1],
+    ["unstarted", 2], // Todo
+    ["started", 3],   // In Progress
+    ["completed", 4],
+    ["canceled", 5]
+  ]);
+  
+  // First find Triage state if it exists
+  const triageState = states.find(s => s.name.toLowerCase() === 'triage');
+  const otherStates = states.filter(s => s.name.toLowerCase() !== 'triage');
+  
+  // Sort non-Triage states by type
+  const sortedOthers = [...otherStates].sort((a, b) => {
+    const aType = (a.type || "").toLowerCase();
+    const bType = (b.type || "").toLowerCase();
+    
+    // If both have a recognized type, sort by the type order map
+    if (typeOrderMap.has(aType) && typeOrderMap.has(bType)) {
+      return (typeOrderMap.get(aType) || 999) - (typeOrderMap.get(bType) || 999);
+    }
+    
+    // If one has a type and the other doesn't, prioritize the one with a type
+    if (typeOrderMap.has(aType) && !typeOrderMap.has(bType)) return -1;
+    if (!typeOrderMap.has(aType) && typeOrderMap.has(bType)) return 1;
+    
+    // Fall back to the original Linear position if types are equal or missing
+    return a.position - b.position;
+  });
+  
+  // Put Triage first, then sorted others
+  const sortedStates = triageState 
+    ? [triageState, ...sortedOthers]
+    : sortedOthers;
+
+  // Apply status filter to visible states
+  const visibleStates = statusParamArr.includes("all") ? sortedStates : sortedStates.filter(s => statusParamArr.includes(s.name));
+
   const base = "/board";
-  const build = (v: string, c: string, val: string) => `${base}?team_id=${teamId}&project_id=${projectId}&view=${v}&filter_category=${c}&filter_value=${val}`;
+  const buildView = (v: string) => {
+    const search = new URLSearchParams({
+      team_id: teamId,
+      project_id: projectId as any,
+      view: v,
+      status: statusParamRaw,
+      priority: priorityParam,
+      label: labelParam,
+      assignee: assigneeParam,
+    });
+    return `${base}?${search.toString()}`;
+  };
 
   /* ------------------------------ RENDER ----------------------------------- */
   return (
@@ -236,118 +295,27 @@ export default async function BoardPage({ searchParams }: { searchParams: Promis
         </div>
         <div className="flex flex-col md:flex-row gap-4 items-center">
           <div className="flex rounded-md shadow-sm">
-            <Link href={build("kanban", filterCat, filterVal)} className={`px-4 py-2 text-sm font-medium rounded-l-md ${view === "kanban" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-secondary"}`}>Kanban</Link>
-            <Link href={build("list", filterCat, filterVal)} className={`px-4 py-2 text-sm font-medium rounded-r-md ${view === "list" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-secondary"}`}>List</Link>
+            <Link href={buildView("kanban")} className={`px-4 py-2 text-sm font-medium rounded-l-md ${view === "kanban" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-secondary"}`}>Kanban</Link>
+            <Link href={buildView("list")} className={`px-4 py-2 text-sm font-medium rounded-r-md ${view === "list" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-secondary"}`}>List</Link>
           </div>
         </div>
       </div>
 
+      {/* Filter controls */}
+      <BoardFilterControls
+        states={states}
+        priorities={priorities}
+        labels={labels}
+        users={users}
+      />
+
       {/* Kanban Board */}
-      {view === "kanban" && <DraggableKanbanBoard workflowStates={states} issuesByState={issuesByState} />}
+      {view === "kanban" && <DraggableKanbanBoard workflowStates={visibleStates} issuesByState={issuesByState} />}
 
       {/* List View */}
       {view === "list" && (
-        <div className="space-y-10 container mx-auto px-4 md:px-6 py-6">
-          {states.map((state) => (
-            <div key={state.id} className="mb-12">
-              <div className="mb-5 max-w-4xl mx-auto">
-                <div className="flex items-center mb-2 pt-8">
-                  <h2 className="text-lg font-semibold text-foreground">{state.name}</h2>
-                  <span className="text-sm text-muted-foreground ml-3">{issuesByState[state.id]?.length || 0}</span>
-                </div>
-              </div>
-
-              <div className="space-y-4 max-w-4xl mx-auto">
-                {issuesByState[state.id]?.map((issue) => (
-                  <Link key={issue.id} href={`/issue/${issue.id}`} className="block">
-                    <div className="border border-border/40 rounded-md hover:bg-secondary/20 transition-colors p-4 md:p-5">
-                      {/* Top Row */}
-                      <div className="flex justify-between items-start mb-6">
-                        <h3 className="font-medium text-base text-foreground max-w-[70%] mt-2">{issue.title}</h3>
-
-                        {/* Assignee */}
-                        {issue.assignee && (
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm text-muted-foreground">{issue.assignee.name}</span>
-                            {issue.assignee.avatarUrl ? (
-                              <img src={issue.assignee.avatarUrl} alt={issue.assignee.name} className="w-6 h-6 rounded-full" />
-                            ) : (
-                              <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-xs">
-                                {issue.assignee.name.charAt(0)}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Bottom Row */}
-                      <div className="flex justify-between items-center">
-                        {/* Priority */}
-                        {issue.priority !== undefined && (
-                          <span
-                            className={`text-xs font-semibold ${
-                              issue.priority === 1
-                                ? "text-red-700 dark:text-red-500"
-                                : issue.priority === 2
-                                ? "text-orange-700 dark:text-orange-500"
-                                : issue.priority === 3
-                                ? "text-yellow-600 dark:text-yellow-400"
-                                : issue.priority === 4
-                                ? "text-gray-600 dark:text-gray-400"
-                                : "text-gray-400 dark:text-gray-600"
-                            }`}
-                            style={{
-                              backgroundColor:
-                                issue.priority === 1
-                                  ? "#ef4444"
-                                  : issue.priority === 2
-                                  ? "#f97316"
-                                  : issue.priority === 3
-                                  ? "#eab308"
-                                  : issue.priority === 4
-                                  ? "#6b7280"
-                                  : "#d1d5db",
-                              padding: "0.25rem 0.5rem",
-                              borderRadius: "0.25rem",
-                              color: "#fff",
-                            }}
-                          >
-                            {issue.priority === 1
-                              ? "Urgent"
-                              : issue.priority === 2
-                              ? "High"
-                              : issue.priority === 3
-                              ? "Medium"
-                              : issue.priority === 4
-                              ? "Low"
-                              : "None"}
-                          </span>
-                        )}
-
-                        {/* Labels */}
-                        <div className="flex flex-wrap gap-1 justify-end">
-                          {issue.labels?.map((label) => (
-                            <LabelBadge key={label.name} color={label.color || "#d1d5db"}>
-                              {label.name}
-                            </LabelBadge>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </Link>
-                ))}
-
-                {/* Empty column fallback */}
-                {(!issuesByState[state.id] || issuesByState[state.id].length === 0) && (
-                  <div className="py-6 text-center text-muted-foreground text-sm border border-dashed rounded-md">No issues</div>
+        <IssueListView workflowStates={visibleStates} issuesByState={issuesByState} />
                 )}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* TODO: List view & filter UI omitted for brevity */}
 
       {/* Floating form button */}
       {teamId && (

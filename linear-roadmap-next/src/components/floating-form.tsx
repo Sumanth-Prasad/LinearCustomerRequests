@@ -13,7 +13,8 @@ export function FloatingForm({ teamId, projectId }: FloatingFormProps) {
       teamId={teamId}
       projectId={projectId}
       triggerText="Submit Request"
-      variant="default"
+      variant="outline"
+      size="lg"
     />
   );
 } 
