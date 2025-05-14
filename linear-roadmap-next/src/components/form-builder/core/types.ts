@@ -50,4 +50,13 @@ export interface LinearIntegrationSettings {
   includeCustomerInfo: boolean;
   defaultTitle: string;
   responseMessage: string;
+}
+
+export interface SavedForm {
+  id: string; // Unique identifier for the form (generated locally)
+  formSettings: FormSettings;
+  fields: FormField[];
+  linearSettings: LinearIntegrationSettings;
+  createdAt: number; // timestamp when created
+  updatedAt: number; // timestamp when last updated
 } 

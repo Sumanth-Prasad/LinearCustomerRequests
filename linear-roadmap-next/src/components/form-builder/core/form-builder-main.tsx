@@ -14,8 +14,9 @@ import { MentionPopup } from "../mentions/mention-popup";
 import { updateMentionPositions, processMentionSelection } from "../mentions/mention-utils";
 import { getDefaultPlaceholder, createNewField } from "../utils/field-utils";
 import { updateField, removeField as removeFieldOp, addOption, removeOption, updateOption } from "../utils/field-operations";
-import type { FieldType, FormField, FieldMention, MentionMenuState, LinearIntegrationSettings, FormSettings, FormType } from "./types";
+import type { FieldType, FormField, FieldMention, MentionMenuState, LinearIntegrationSettings, FormSettings, FormType, SavedForm } from "./types";
 import { LexicalBadgeEditor } from "@/components/LexicalBadgeEditor";
+import { useSearchParams } from 'next/navigation';
 
 // Add the global declaration for our helper methods
 declare global {
@@ -104,6 +105,11 @@ export default function FormBuilder() {
   const [showLinearSettings, setShowLinearSettings] = useState(false);
   const [disableSearchByDefault, setDisableSearchByDefault] = useState(true);
   
+  // ===== LOAD EXISTING FORM IF QUERY PARAM PROVIDED =====
+  const searchParams = useSearchParams();
+  const initialFormId = searchParams.get('formId');
+  const [formId, setFormId] = useState<string | null>(initialFormId);
+  
   // Mention system state
   const [mentionMenu, setMentionMenu] = useState<MentionMenuState>({
     isOpen: false,
@@ -155,12 +161,63 @@ export default function FormBuilder() {
   
   // Save the form
   const handleSaveForm = () => {
-    console.log("Saving form:", { 
-      formSettings,
-      fields, 
-      linearSettings 
-    });
-    // API call or other logic for saving would go here
+    // Basic validation: ensure a title and at least one field exists
+    if (!formSettings.title.trim()) {
+      alert('Form title is required.');
+      return;
+    }
+    if (fields.length === 0) {
+      alert('Please add at least one field to the form.');
+      return;
+    }
+
+    try {
+      const now = Date.now();
+      const storedRaw = localStorage.getItem('savedForms') || '[]';
+      const savedForms: SavedForm[] = JSON.parse(storedRaw);
+
+      if (formId) {
+        // Update existing
+        const idx = savedForms.findIndex(f => f.id === formId);
+        if (idx !== -1) {
+          savedForms[idx] = {
+            ...savedForms[idx],
+            formSettings,
+            fields,
+            linearSettings,
+            updatedAt: now,
+          };
+        } else {
+          // Not found, treat as new
+          savedForms.push({
+            id: formId,
+            formSettings,
+            fields,
+            linearSettings,
+            createdAt: now,
+            updatedAt: now,
+          });
+        }
+      } else {
+        // Create new form
+        const newId = now.toString();
+        setFormId(newId);
+        savedForms.push({
+          id: newId,
+          formSettings,
+          fields,
+          linearSettings,
+          createdAt: now,
+          updatedAt: now,
+        });
+      }
+
+      localStorage.setItem('savedForms', JSON.stringify(savedForms));
+      alert('Form saved locally!');
+    } catch (err) {
+      console.error('Error saving form', err);
+      alert('Failed to save form. See console for details.');
+    }
   };
 
   // ===== VALIDATION =====
@@ -599,6 +656,26 @@ export default function FormBuilder() {
       }
     }
   }, [mentionMenu.inputId, mentions]);
+
+  // Load form data when formId is present
+  useEffect(() => {
+    if (!initialFormId) return;
+
+    try {
+      const savedRaw = localStorage.getItem('savedForms');
+      if (!savedRaw) return;
+
+      const savedForms: SavedForm[] = JSON.parse(savedRaw);
+      const existing = savedForms.find((f) => f.id === initialFormId);
+      if (existing) {
+        setFields(existing.fields);
+        setFormSettings(existing.formSettings);
+        setLinearSettings(existing.linearSettings);
+      }
+    } catch (err) {
+      console.error('Error loading saved form', err);
+    }
+  }, [initialFormId]);
 
   // ===== RENDER =====
   return (
