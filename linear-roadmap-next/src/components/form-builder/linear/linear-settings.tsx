@@ -85,13 +85,8 @@ export function LinearSettings({
   const [lastResponseMessageWithAt, setLastResponseMessageWithAt] = useState<string | null>(null);
   
   // Store tracked mentions
-  const mentionsRef = useRef<{
-    default_title: Record<string, string>;
-    response_message: Record<string, string>;
-  }>({
-    default_title: {},
-    response_message: {}
-  });
+  const [defaultTitleMentions, setDefaultTitleMentions] = useState<{id: string, text: string}[]>([]);
+  const [responseMessageMentions, setResponseMessageMentions] = useState<{id: string, text: string}[]>([]);
   
   // API data
   const [teams, setTeams] = useState<LinearTeam[]>([]);
@@ -263,72 +258,64 @@ export function LinearSettings({
     });
   };
 
-  // Check for newly selected mentions
+  // Track mention selection by detecting when @ disappears
   const checkForMentionSelection = (
-    fieldId: 'default_title' | 'response_message',
-    newValue: string,
-    previousValueWithAt: string | null
+    newValue: string, 
+    previousValueWithAt: string | null, 
+    fieldMentions: FieldMention[], 
+    setLastValueWithAt: React.Dispatch<React.SetStateAction<string | null>>,
+    setTrackedMentions: React.Dispatch<React.SetStateAction<{id: string, text: string}[]>>
   ) => {
     // If we had a value with @ before, and now @ is gone, a mention might have been selected
-    if (previousValueWithAt?.includes('@') && !newValue.includes('@')) {
-      console.log(`Possible mention selection detected in ${fieldId}`);
+    if (previousValueWithAt && previousValueWithAt.includes('@') && !newValue.includes('@')) {
+      console.log('Possible mention selection detected');
+      console.log('Previous value with @:', previousValueWithAt);
+      console.log('New value without @:', newValue);
       
-      // If we have mention data, try to identify what was selected
-      const fieldMentions = mentions[fieldId] || [];
-      if (fieldMentions.length > 0) {
+      // If we have field mentions data, try to identify the selected mention
+      if (fieldMentions && fieldMentions.length > 0) {
+        // Get the latest mention
         const latestMention = fieldMentions[fieldMentions.length - 1];
         if (latestMention) {
-          console.log('Latest mention:', latestMention);
+          console.log('Found latest mention:', latestMention);
           
-          // Track this mention using a simple object lookup
-          mentionsRef.current[fieldId][latestMention.id] = 
-            (latestMention as any).displayName || 
-            (latestMention as any).name || 
-            String(latestMention.id);
-            
-          console.log('Updated mentions:', mentionsRef.current);
+          // Add to tracked mentions
+          setTrackedMentions(prev => [
+            ...prev, 
+            {
+              id: latestMention.id,
+              // Use type assertion to safely access properties
+              text: String((latestMention as any).label || latestMention.id)
+            }
+          ]);
         }
       }
       
-      // Reset tracking state
-      if (fieldId === 'default_title') {
-        setLastDefaultTitleWithAt(null);
-      } else {
-        setLastResponseMessageWithAt(null);
-      }
+      // Reset the tracking state
+      setLastValueWithAt(null);
     } 
     // If the new value has @ but we weren't tracking one before, start tracking
     else if (newValue.includes('@') && !previousValueWithAt) {
-      if (fieldId === 'default_title') {
-        setLastDefaultTitleWithAt(newValue);
-      } else {
-        setLastResponseMessageWithAt(newValue);
-      }
+      setLastValueWithAt(newValue);
     }
-    // If we still have an @ in both values, keep tracking
+    // If we still have an @ in both values, keep tracking the current one
     else if (newValue.includes('@') && previousValueWithAt) {
-      if (fieldId === 'default_title') {
-        setLastDefaultTitleWithAt(newValue);
-      } else {
-        setLastResponseMessageWithAt(newValue);
-      }
+      setLastValueWithAt(newValue);
     }
   };
   
-  // Create a string with mentions appended
-  const appendMentionsToText = (text: string, fieldId: 'default_title' | 'response_message'): string => {
-    const mentionsMap = mentionsRef.current[fieldId];
-    if (!Object.keys(mentionsMap).length) return text;
+  // Combine regular text with serialized mentions
+  const appendMentionsToText = (text: string, trackedMentions: {id: string, text: string}[]): string => {
+    if (!trackedMentions.length) return text;
     
     let result = text;
     
-    // Append each tracked mention
-    Object.entries(mentionsMap).forEach(([id, displayText]) => {
-      // Format compatible with both markdown and a more standardized syntax
-      const mentionString = `@${displayText}{${id}}`;
+    // Append each tracked mention to the output text
+    trackedMentions.forEach(mention => {
+      const mentionString = `@[${mention.text}](${mention.id})`;
       
       // Only add if not already present
-      if (!result.includes(mentionString) && !result.includes(`@${displayText}`)) {
+      if (!result.includes(mentionString)) {
         result = result.trim() + ' ' + mentionString + ' ';
       }
     });
@@ -336,78 +323,37 @@ export function LinearSettings({
     return result;
   };
   
-  // Extract mentions from saved text
-  const extractMentionsFromText = (text: string, fieldId: 'default_title' | 'response_message'): void => {
-    // Format 1: @[text](id)
-    const format1Matches = text.match(/@\[([^\]]+)\]\(([^)]+)\)/g) || [];
-    format1Matches.forEach(match => {
+  // Extract mentions from a serialized string with format @[text](id)
+  const extractMentionsFromText = (text: string): {id: string, text: string}[] => {
+    const matches = text.match(/@\[([^\]]+)\]\(([^)]+)\)/g) || [];
+    return matches.map(match => {
       const textMatch = match.match(/@\[([^\]]+)\]/) || [];
       const idMatch = match.match(/\(([^)]+)\)/) || [];
-      if (textMatch[1] && idMatch[1]) {
-        mentionsRef.current[fieldId][idMatch[1]] = textMatch[1];
-      }
-    });
-    
-    // Format 2: @text{id}
-    const format2Matches = text.match(/@([^{]+){([^}]+)}/g) || [];
-    format2Matches.forEach(match => {
-      const parts = match.match(/@([^{]+){([^}]+)}/) || [];
-      if (parts[1] && parts[2]) {
-        mentionsRef.current[fieldId][parts[2]] = parts[1];
-      }
+      return {
+        text: textMatch[1] || '',
+        id: idMatch[1] || ''
+      };
     });
   };
   
-  // Initialize mentions from saved values
+  // Initialize tracked mentions from saved values
   useEffect(() => {
     if (linearSettings.defaultTitle) {
-      extractMentionsFromText(linearSettings.defaultTitle, 'default_title');
+      const extractedMentions = extractMentionsFromText(linearSettings.defaultTitle);
+      if (extractedMentions.length > 0) {
+        console.log('Extracted mentions from default title:', extractedMentions);
+        setDefaultTitleMentions(extractedMentions);
+      }
     }
     
     if (linearSettings.responseMessage) {
-      extractMentionsFromText(linearSettings.responseMessage, 'response_message');
+      const extractedMentions = extractMentionsFromText(linearSettings.responseMessage);
+      if (extractedMentions.length > 0) {
+        console.log('Extracted mentions from response message:', extractedMentions);
+        setResponseMessageMentions(extractedMentions);
+      }
     }
-    
-    console.log('Extracted mentions:', mentionsRef.current);
-  }, []);
-  
-  // Track changes to mentions from parent component
-  useEffect(() => {
-    console.log('Field mentions from parent:', mentions);
-    
-    // When mentions change, update our tracked mentions
-    if (mentions['default_title']?.length) {
-      // Use a simple loop instead to avoid type errors
-      mentions['default_title'].forEach(mention => {
-        const displayText = (mention as any).displayName || 
-                            (mention as any).name || 
-                            String(mention.id);
-        
-        mentionsRef.current['default_title'][mention.id] = displayText;
-      });
-    }
-    
-    if (mentions['response_message']?.length) {
-      // Use a simple loop instead to avoid type errors
-      mentions['response_message'].forEach(mention => {
-        const displayText = (mention as any).displayName || 
-                            (mention as any).name || 
-                            String(mention.id);
-        
-        mentionsRef.current['response_message'][mention.id] = displayText;
-      });
-    }
-  }, [mentions]);
-  
-  // Debug the current serialized values whenever they change
-  useEffect(() => {
-    if (linearSettings.defaultTitle) {
-      console.log('Current default title value:', linearSettings.defaultTitle);
-    }
-    if (linearSettings.responseMessage) {
-      console.log('Current response message value:', linearSettings.responseMessage);
-    }
-  }, [linearSettings.defaultTitle, linearSettings.responseMessage]);
+  }, []); // Run once on mount
 
   // Get priority display name
   const getPriorityLabel = (priority?: LinearPriority): string => {
@@ -916,13 +862,15 @@ export function LinearSettings({
                   
                   // Check if a mention was just selected
                   checkForMentionSelection(
-                    'default_title',
-                    v,
-                    lastDefaultTitleWithAt
+                    v, 
+                    lastDefaultTitleWithAt, 
+                    mentions['default_title'] || [], 
+                    setLastDefaultTitleWithAt,
+                    setDefaultTitleMentions
                   );
                   
                   // Append serialized mentions to text
-                  const valueWithMentions = appendMentionsToText(v, 'default_title');
+                  const valueWithMentions = appendMentionsToText(v, defaultTitleMentions);
                   
                   // Update settings with enhanced value
                   setLinearSettings(prev => ({...prev, defaultTitle: valueWithMentions}));
@@ -951,13 +899,15 @@ export function LinearSettings({
                   
                   // Check if a mention was just selected
                   checkForMentionSelection(
-                    'response_message',
-                    v,
-                    lastResponseMessageWithAt
+                    v, 
+                    lastResponseMessageWithAt, 
+                    mentions['response_message'] || [], 
+                    setLastResponseMessageWithAt,
+                    setResponseMessageMentions
                   );
                   
                   // Append serialized mentions to text
-                  const valueWithMentions = appendMentionsToText(v, 'response_message');
+                  const valueWithMentions = appendMentionsToText(v, responseMessageMentions);
                   
                   // Update settings with enhanced value
                   setLinearSettings(prev => ({...prev, responseMessage: valueWithMentions}));
