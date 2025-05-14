@@ -111,4 +111,102 @@ export async function updateIssue(formData: FormData): Promise<void> {
     console.error("Error updating issue:", error);
     throw new Error(`Failed to update issue: ${error}`);
   }
+}
+
+// Server action to create an issue in Linear from a submitted form
+export async function submitFormIssue(formData: FormData): Promise<{ success: boolean; issueId?: string; error?: string }> {
+  "use server";
+  try {
+    // Basic props
+    const teamId = (formData.get("teamId") as string) || "";
+    const projectId = (formData.get("projectId") as string) || undefined;
+    const formId = (formData.get("formId") as string) || "";
+    const linearSettingsRaw = formData.get("linearSettings") as string | null;
+    let linearSettings: any = {};
+    if (linearSettingsRaw) {
+      try { linearSettings = JSON.parse(linearSettingsRaw); } catch {}
+    }
+
+    if (!teamId) throw new Error("Missing teamId");
+
+    // Collect field values (exclude our hidden inputs)
+    const fieldEntries: Record<string, string> = {};
+    for (const [key, value] of formData.entries()) {
+      if (["teamId", "projectId", "formId"].includes(key)) continue;
+      fieldEntries[key] = String(value);
+    }
+
+    const client = getLinearClient();
+
+    // Build title using template if provided
+    const rawSubmittedTitle = fieldEntries['title'] || Object.values(fieldEntries)[0] || 'New request';
+    const template = (linearSettings?.defaultTitle as string | undefined);
+    const title = template ? template.replace('{title}', rawSubmittedTitle) : rawSubmittedTitle;
+
+    // Base description from responseMessage if provided
+    let description = '';
+    if(linearSettings?.responseMessage){
+      description += linearSettings.responseMessage.replace('{title}', rawSubmittedTitle) + '\n\n';
+    }
+
+    description += `Submitted via website form (formId: ${formId}).\n\n`;
+
+    // Build markdown body listing each field label/value
+    Object.entries(fieldEntries).forEach(([k, v]) => {
+      if(k!=='linearSettings' && k!=='title' && k!=='description')
+        description += `**${k}**: ${v}\n`;
+    });
+
+    // Map priority string to number
+    const priorityMap: any = { 'urgent':1, 'high':2, 'medium':3, 'low':4, 'no_priority':0 };
+    const priorityVal = priorityMap[linearSettings.priority] ?? undefined;
+
+    // Resolve label IDs if provided
+    let labelIds: string[] | undefined;
+    if(Array.isArray(linearSettings.labels) && linearSettings.labels.length){
+      try{
+        const labelQuery = `query Labels($teamId: String!){ team(id:$teamId){ labels{ nodes{ id name } } } }`;
+        const labelRes: any = await client.client.rawRequest(labelQuery,{teamId});
+        const available = labelRes?.data?.team?.labels?.nodes || [];
+        labelIds = available.filter((l:any)=>linearSettings.labels.includes(l.name)).map((l:any)=>l.id);
+      }catch{}
+    }
+
+    if (linearSettings?.issueType === 'customer_request') {
+      // override title & description per requirements
+      const crTitle = rawSubmittedTitle;
+      const crDesc = linearSettings?.responseMessage ? linearSettings.responseMessage.replace('{title}', rawSubmittedTitle) : '';
+      const issueInput: Record<string, any> = { teamId, title: crTitle, description: '' };
+      if (projectId && projectId !== 'undefined') issueInput.projectId = projectId;
+      if(priorityVal!==undefined) issueInput.priority = priorityVal;
+      if(labelIds?.length) issueInput.labelIds = labelIds;
+      const mutation = `mutation IssueCreate($input: IssueCreateInput!) { issueCreate(input: $input) { success issue { id } } }`;
+      const res: any = await client.client.rawRequest(mutation, { input: issueInput });
+      const issueCreate = res?.data?.issueCreate;
+      if (!issueCreate?.success) throw new Error('Linear issue creation failed');
+
+      // Step 2: attach a customer need (request) to it
+      const needInput: Record<string, any> = {
+        issueId: issueCreate.issue.id,
+        body: crDesc
+      };
+      const needMutation = `mutation CustomerNeedCreate($input: CustomerNeedCreateInput!) { customerNeedCreate(input: $input) { success } }`;
+      await client.client.rawRequest(needMutation, { input: needInput });
+
+      return { success: true, issueId: issueCreate.issue.id };
+    } else {
+      const input: Record<string, any> = { teamId, title, description };
+      if (projectId && projectId !== 'undefined') input.projectId = projectId;
+      if(priorityVal!==undefined) input.priority = priorityVal;
+      if(labelIds?.length) input.labelIds = labelIds;
+      const mutation = `mutation IssueCreate($input: IssueCreateInput!) { issueCreate(input: $input) { success issue { id } } }`;
+      const res: any = await client.client.rawRequest(mutation, { input });
+      const issueCreate = res?.data?.issueCreate;
+      if (!issueCreate?.success) throw new Error('Linear issue creation failed');
+      return { success: true, issueId: issueCreate.issue.id };
+    }
+  } catch (error: any) {
+    console.error("submitFormIssue error", error);
+    return { success: false, error: error?.message || String(error) };
+  }
 } 

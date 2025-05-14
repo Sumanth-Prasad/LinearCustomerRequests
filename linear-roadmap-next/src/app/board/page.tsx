@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { LabelBadge } from "@/components/custom-label-badge";
 import { DraggableKanbanBoard } from "@/components/draggable-kanban-board";
+import { FormSubmitDialog } from "@/components/form-submit-dialog";
+import { FloatingForm } from "@/components/floating-form";
 
 /*--------------------------------------------------------------------
   NOTE: This component is a direct copy of the previous /roadmap page
@@ -347,13 +349,12 @@ export default async function BoardPage({ searchParams }: { searchParams: Promis
 
       {/* TODO: List view & filter UI omitted for brevity */}
 
-      <div className="fixed bottom-6 right-6">
-        <Link href="/issue/create">
-          <Button size="lg" className="rounded-full h-14 w-14 shadow-lg bg-blue-600 hover:bg-blue-700 text-white">
-            <span className="text-xl">+</span>
-          </Button>
-        </Link>
-      </div>
+      {/* Floating form button */}
+      {teamId && (
+        <div className="fixed bottom-6 right-6">
+          <FloatingForm teamId={teamId} projectId={projectId} />
+        </div>
+      )}
     </main>
   );
 } 

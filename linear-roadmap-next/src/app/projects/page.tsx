@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { getLinearClient } from "@/lib/linear";
 import { Separator } from "@/components/ui/separator";
+import { FormSubmitDialog } from "@/components/form-submit-dialog";
 
 // Define search params type for this page
 type ProjectsSearchParams = {
@@ -107,6 +108,7 @@ export default async function ProjectsPage({
                     <Link href={`/board?team_id=${teamId}&project_id=${project.id}`}>
                       <Button className="w-full">Open Issue Board</Button>
                     </Link>
+                    <FormSubmitDialog teamId={teamId} projectId={project.id} triggerText="Submit Request" variant="outline" />
                   </div>
                 </div>
               </Card>
@@ -116,4 +118,4 @@ export default async function ProjectsPage({
       </section>
     </main>
   );
-} 
+}
