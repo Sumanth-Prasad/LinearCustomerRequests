@@ -75,6 +75,24 @@ export function LinearSettings({
   const [isLoadingLabels, setIsLoadingLabels] = useState(false);
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
   
+  const [responseEditorKey, setResponseEditorKey] = useState(Date.now());
+  const responseMessageEditorWrapperRef = useRef<HTMLDivElement>(null);
+  const [defaultTitleEditorKey, setDefaultTitleEditorKey] = useState(Date.now());
+  const defaultTitleEditorWrapperRef = useRef<HTMLDivElement>(null);
+  
+  // Track last text value with '@' to detect mention selection
+  const [lastDefaultTitleWithAt, setLastDefaultTitleWithAt] = useState<string | null>(null);
+  const [lastResponseMessageWithAt, setLastResponseMessageWithAt] = useState<string | null>(null);
+  
+  // Store tracked mentions
+  const mentionsRef = useRef<{
+    default_title: Record<string, string>;
+    response_message: Record<string, string>;
+  }>({
+    default_title: {},
+    response_message: {}
+  });
+  
   // API data
   const [teams, setTeams] = useState<LinearTeam[]>([]);
   const [projects, setProjects] = useState<LinearProject[]>([]);
@@ -181,6 +199,45 @@ export function LinearSettings({
     }
   }, [linearSettings.team]);
   
+  useEffect(() => {
+    const handleDocumentMouseDown = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      const responseEditorWrapper = responseMessageEditorWrapperRef.current;
+      const titleEditorWrapper = defaultTitleEditorWrapperRef.current;
+
+      // Handle Response Message Editor
+      if (responseEditorWrapper && !responseEditorWrapper.contains(target)) {
+        const activeElement = document.activeElement;
+        if (activeElement && responseEditorWrapper.contains(activeElement)) {
+          if (typeof (activeElement as HTMLElement).blur === 'function') {
+            (activeElement as HTMLElement).blur();
+          }
+          setTimeout(() => {
+            setResponseEditorKey(Date.now());
+          }, 0);
+        }
+      }
+
+      // Handle Default Title Editor
+      if (titleEditorWrapper && !titleEditorWrapper.contains(target)) {
+        const activeElement = document.activeElement;
+        if (activeElement && titleEditorWrapper.contains(activeElement)) {
+          if (typeof (activeElement as HTMLElement).blur === 'function') {
+            (activeElement as HTMLElement).blur();
+          }
+          setTimeout(() => {
+            setDefaultTitleEditorKey(Date.now());
+          }, 0);
+        }
+      }
+    };
+
+    document.addEventListener('mousedown', handleDocumentMouseDown, true);
+    return () => {
+      document.removeEventListener('mousedown', handleDocumentMouseDown, true);
+    };
+  }, []); // Empty dependency array
+  
   // Handle label selection
   const handleAddLabel = (labelId: string) => {
     const label = labels.find(l => l.id === labelId);
@@ -205,6 +262,152 @@ export function LinearSettings({
       labels: (linearSettings.labels || []).filter(name => name !== labelName)
     });
   };
+
+  // Check for newly selected mentions
+  const checkForMentionSelection = (
+    fieldId: 'default_title' | 'response_message',
+    newValue: string,
+    previousValueWithAt: string | null
+  ) => {
+    // If we had a value with @ before, and now @ is gone, a mention might have been selected
+    if (previousValueWithAt?.includes('@') && !newValue.includes('@')) {
+      console.log(`Possible mention selection detected in ${fieldId}`);
+      
+      // If we have mention data, try to identify what was selected
+      const fieldMentions = mentions[fieldId] || [];
+      if (fieldMentions.length > 0) {
+        const latestMention = fieldMentions[fieldMentions.length - 1];
+        if (latestMention) {
+          console.log('Latest mention:', latestMention);
+          
+          // Track this mention using a simple object lookup
+          mentionsRef.current[fieldId][latestMention.id] = 
+            (latestMention as any).displayName || 
+            (latestMention as any).name || 
+            String(latestMention.id);
+            
+          console.log('Updated mentions:', mentionsRef.current);
+        }
+      }
+      
+      // Reset tracking state
+      if (fieldId === 'default_title') {
+        setLastDefaultTitleWithAt(null);
+      } else {
+        setLastResponseMessageWithAt(null);
+      }
+    } 
+    // If the new value has @ but we weren't tracking one before, start tracking
+    else if (newValue.includes('@') && !previousValueWithAt) {
+      if (fieldId === 'default_title') {
+        setLastDefaultTitleWithAt(newValue);
+      } else {
+        setLastResponseMessageWithAt(newValue);
+      }
+    }
+    // If we still have an @ in both values, keep tracking
+    else if (newValue.includes('@') && previousValueWithAt) {
+      if (fieldId === 'default_title') {
+        setLastDefaultTitleWithAt(newValue);
+      } else {
+        setLastResponseMessageWithAt(newValue);
+      }
+    }
+  };
+  
+  // Create a string with mentions appended
+  const appendMentionsToText = (text: string, fieldId: 'default_title' | 'response_message'): string => {
+    const mentionsMap = mentionsRef.current[fieldId];
+    if (!Object.keys(mentionsMap).length) return text;
+    
+    let result = text;
+    
+    // Append each tracked mention
+    Object.entries(mentionsMap).forEach(([id, displayText]) => {
+      // Format compatible with both markdown and a more standardized syntax
+      const mentionString = `@${displayText}{${id}}`;
+      
+      // Only add if not already present
+      if (!result.includes(mentionString) && !result.includes(`@${displayText}`)) {
+        result = result.trim() + ' ' + mentionString + ' ';
+      }
+    });
+    
+    return result;
+  };
+  
+  // Extract mentions from saved text
+  const extractMentionsFromText = (text: string, fieldId: 'default_title' | 'response_message'): void => {
+    // Format 1: @[text](id)
+    const format1Matches = text.match(/@\[([^\]]+)\]\(([^)]+)\)/g) || [];
+    format1Matches.forEach(match => {
+      const textMatch = match.match(/@\[([^\]]+)\]/) || [];
+      const idMatch = match.match(/\(([^)]+)\)/) || [];
+      if (textMatch[1] && idMatch[1]) {
+        mentionsRef.current[fieldId][idMatch[1]] = textMatch[1];
+      }
+    });
+    
+    // Format 2: @text{id}
+    const format2Matches = text.match(/@([^{]+){([^}]+)}/g) || [];
+    format2Matches.forEach(match => {
+      const parts = match.match(/@([^{]+){([^}]+)}/) || [];
+      if (parts[1] && parts[2]) {
+        mentionsRef.current[fieldId][parts[2]] = parts[1];
+      }
+    });
+  };
+  
+  // Initialize mentions from saved values
+  useEffect(() => {
+    if (linearSettings.defaultTitle) {
+      extractMentionsFromText(linearSettings.defaultTitle, 'default_title');
+    }
+    
+    if (linearSettings.responseMessage) {
+      extractMentionsFromText(linearSettings.responseMessage, 'response_message');
+    }
+    
+    console.log('Extracted mentions:', mentionsRef.current);
+  }, []);
+  
+  // Track changes to mentions from parent component
+  useEffect(() => {
+    console.log('Field mentions from parent:', mentions);
+    
+    // When mentions change, update our tracked mentions
+    if (mentions['default_title']?.length) {
+      // Use a simple loop instead to avoid type errors
+      mentions['default_title'].forEach(mention => {
+        const displayText = (mention as any).displayName || 
+                            (mention as any).name || 
+                            String(mention.id);
+        
+        mentionsRef.current['default_title'][mention.id] = displayText;
+      });
+    }
+    
+    if (mentions['response_message']?.length) {
+      // Use a simple loop instead to avoid type errors
+      mentions['response_message'].forEach(mention => {
+        const displayText = (mention as any).displayName || 
+                            (mention as any).name || 
+                            String(mention.id);
+        
+        mentionsRef.current['response_message'][mention.id] = displayText;
+      });
+    }
+  }, [mentions]);
+  
+  // Debug the current serialized values whenever they change
+  useEffect(() => {
+    if (linearSettings.defaultTitle) {
+      console.log('Current default title value:', linearSettings.defaultTitle);
+    }
+    if (linearSettings.responseMessage) {
+      console.log('Current response message value:', linearSettings.responseMessage);
+    }
+  }, [linearSettings.defaultTitle, linearSettings.responseMessage]);
 
   // Get priority display name
   const getPriorityLabel = (priority?: LinearPriority): string => {
@@ -240,6 +443,89 @@ export function LinearSettings({
       case 'custom': return customType || 'Custom Request';
       default: return 'Request';
     }
+  };
+
+  // Function to preserve mentions in serialized form
+  const preserveMentionsInString = (editorElement: HTMLElement | null, plainTextValue: string): string => {
+    if (!editorElement) return plainTextValue;
+    
+    // Try multiple possible selectors for mention badges
+    const mentionSelectors = [
+      '[data-mention]',                     // Common attribute for mentions
+      '[data-type="mention"]',              // Another common attribute
+      '.mention-badge',                     // Class-based selection
+      '.badge',                             // Generic badge class
+      '[class*="mention"]',                 // Any class containing "mention"
+      '[class*="badge"]',                   // Any class containing "badge"
+      '[data-lexical-mention]',             // Lexical-specific attribute
+      'span[data-lexical-decorator="true"]' // Lexical decorator elements
+    ];
+    
+    // Try each selector until we find mentions
+    let mentionElements: NodeListOf<Element> = document.createDocumentFragment().querySelectorAll('*'); // Empty NodeList
+    
+    for (const selector of mentionSelectors) {
+      const elements = editorElement.querySelectorAll(selector);
+      if (elements.length > 0) {
+        console.log(`Found ${elements.length} mentions using selector: ${selector}`);
+        mentionElements = elements;
+        break;
+      }
+    }
+    
+    if (mentionElements.length === 0) {
+      console.log("No mentions found in the editor with any selector");
+      return plainTextValue;
+    }
+    
+    // Clone the text value so we can modify it
+    let result = plainTextValue;
+    
+    // Create a temporary div to help with text extraction
+    const tempDiv = document.createElement('div');
+    
+    // Process each mention badge
+    mentionElements.forEach((mentionEl) => {
+      // Try different ways to extract the mention ID and text
+      let mentionId = '';
+      let mentionText = '';
+      
+      // Try data-* attributes first
+      const possibleIdAttrs = ['data-mention-id', 'data-id', 'id', 'data-value'];
+      for (const attr of possibleIdAttrs) {
+        const value = mentionEl.getAttribute(attr);
+        if (value) {
+          mentionId = value;
+          break;
+        }
+      }
+      
+      // If no ID found, try to use a fallback
+      if (!mentionId) {
+        mentionId = 'mention-' + Math.random().toString(36).substring(2, 9);
+      }
+      
+      // Extract text content
+      tempDiv.innerHTML = mentionEl.innerHTML;
+      mentionText = tempDiv.textContent || '';
+      
+      // Remove any @ symbol at the beginning if present
+      mentionText = mentionText.replace(/^@/, '').trim();
+      
+      if (mentionText) {
+        // Create a serialized mention tag
+        const mentionTag = `@[${mentionText}](${mentionId})`;
+        
+        // For simplicity, we'll append mentions at the end if we can't determine position
+        if (!result.includes(mentionTag) && !result.includes(`@${mentionText}`)) {
+          console.log(`Adding mention tag: ${mentionTag}`);
+          result = result.trim() + ' ' + mentionTag + ' ';
+        }
+      }
+    });
+    
+    console.log("Enhanced output with mentions:", result);
+    return result;
   };
 
   // Markdown editing function
@@ -300,19 +586,6 @@ export function LinearSettings({
       }
     }, 0);
   };
-
-  // Utility: blur response message editor to prevent scroll focus shifts
-  const blurResponseEditor = () => {
-    const el = document.querySelector('[data-fieldid="response_message"] [contenteditable="true"]') as HTMLElement | null;
-    if (el && document.activeElement === el) {
-      el.blur();
-    }
-  };
-
-  // Blur the response editor when other controls change to stop it from stealing focus
-  useEffect(() => {
-    blurResponseEditor();
-  }, [linearSettings.issueType, linearSettings.team, linearSettings.project, linearSettings.status, linearSettings.labels, linearSettings.assignee, linearSettings.priority]);
 
   return (
     <div className="border border-border p-4 rounded bg-background mt-6">
@@ -631,43 +904,73 @@ export function LinearSettings({
             <p className="text-xs text-muted-foreground mt-1">Sets the default priority for issues created from this form</p>
           </div>
           
-          {/* Title field with mentions support */}
+          {/* Title field with mentions support - now using LexicalBadgeEditor */}
           <div>
             <label className="block mb-2 font-medium">Default Title Format</label>
-            <BadgeInput
-              fieldId="default_title"
-              value={linearSettings.defaultTitle}
-              mentions={mentions['default_title'] || []}
-              InputComponent="input"
-              inputProps={{
-                type: 'text',
-                id: 'default_title',
-                placeholder: 'Enter default title',
-                className: 'w-full p-2 border rounded focus:outline-none',
-                value: linearSettings.defaultTitle
-              }}
-              onInputChange={handleInputChange}
-              onKeyDown={handleKeyDown}
-              onRemoveMention={handleRemoveMention}
-              inputRefs={inputRefs}
-            />
+            <div ref={defaultTitleEditorWrapperRef}>
+              <LexicalBadgeEditor
+                key={defaultTitleEditorKey}
+                value={linearSettings.defaultTitle}
+                onChange={(v) => {
+                  console.log("Default Title onChange output:", v, "Length:", v.length);
+                  
+                  // Check if a mention was just selected
+                  checkForMentionSelection(
+                    'default_title',
+                    v,
+                    lastDefaultTitleWithAt
+                  );
+                  
+                  // Append serialized mentions to text
+                  const valueWithMentions = appendMentionsToText(v, 'default_title');
+                  
+                  // Update settings with enhanced value
+                  setLinearSettings(prev => ({...prev, defaultTitle: valueWithMentions}));
+                }}
+                fields={fields}
+                placeholder="Enter default title"
+                className="border border-border rounded-md p-2 bg-background text-foreground min-h-[42px]"
+                fieldId="default_title"
+                isMarkdown={false}
+                disableMarkdownShortcuts={true}
+                autoFocus={false}
+              />
+            </div>
             <p className="text-xs text-muted-foreground mt-1">Use {'{title}'} to include the submitted title. Type @ to reference form fields.</p>
           </div>
           
           {/* Response message field with Lexical editor and badge support */}
           <div>
             <label className="block mb-2 font-medium">Response Message</label>
-            <LexicalBadgeEditor
-              value={linearSettings.responseMessage}
-              onChange={(v) => setLinearSettings({...linearSettings, responseMessage: v})}
-              fields={fields}
-              placeholder="Enter response message..."
-              className="border border-border rounded-md p-2 bg-background text-foreground min-h-[250px]"
-              fieldId="response_message"
-              isMarkdown={true}
-              disableMarkdownShortcuts={false}
-              autoFocus={false}
-            />
+            <div ref={responseMessageEditorWrapperRef}>
+              <LexicalBadgeEditor
+                key={responseEditorKey}
+                value={linearSettings.responseMessage}
+                onChange={(v) => {
+                  console.log("Response Message onChange output:", v, "Length:", v.length, "Contains @:", v.includes('@'));
+                  
+                  // Check if a mention was just selected
+                  checkForMentionSelection(
+                    'response_message',
+                    v,
+                    lastResponseMessageWithAt
+                  );
+                  
+                  // Append serialized mentions to text
+                  const valueWithMentions = appendMentionsToText(v, 'response_message');
+                  
+                  // Update settings with enhanced value
+                  setLinearSettings(prev => ({...prev, responseMessage: valueWithMentions}));
+                }}
+                fields={fields}
+                placeholder="Enter response message..."
+                className="border border-border rounded-md p-2 bg-background text-foreground min-h-[250px]"
+                fieldId="response_message"
+                isMarkdown={true}
+                disableMarkdownShortcuts={false}
+                autoFocus={false}
+              />
+            </div>
             <p className="text-xs text-muted-foreground mt-1">
               Shown to users after form submission. Type @ to reference form fields. Supports markdown formatting.
               Try typing # for headings, * for lists, {'>'} for quotes, ** for bold, * for italic.

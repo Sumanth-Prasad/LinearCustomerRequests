@@ -46,6 +46,7 @@
     "encoding": "^0.1.13",
     "jotai": "^2.12.4",
     "lexical": "^0.31.1",
+    "lexical-beautiful-mentions": "^0.1.47",
     "lodash.throttle": "^4.1.1",
     "lucide-react": "^0.508.0",
     "marked": "^15.0.11",
