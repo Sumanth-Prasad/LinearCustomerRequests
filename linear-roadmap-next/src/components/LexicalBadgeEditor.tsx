@@ -810,6 +810,7 @@ interface LexicalBadgeEditorProps {
   isMarkdown?: boolean; // New prop to enable markdown mode
   disableMarkdownShortcuts?: boolean; // New prop to disable markdown shortcuts
   hideMarkdownHelp?: boolean; // New prop to hide markdown help dropdown
+  autoFocus?: boolean; // Whether to auto-focus the editor on mount (default: true)
 }
 
 export function LexicalBadgeEditor({ 
@@ -821,7 +822,8 @@ export function LexicalBadgeEditor({
   fieldId, 
   isMarkdown = false, 
   disableMarkdownShortcuts = false,
-  hideMarkdownHelp = false
+  hideMarkdownHelp = false,
+  autoFocus = true
 }: LexicalBadgeEditorProps) {
   // Use shared editor config with explicitly defined nodes
   const initialConfig = useMemo(() => {
@@ -952,7 +954,7 @@ export function LexicalBadgeEditor({
   };
 
   return (
-    <div ref={containerRef} className={className + " relative lexical-editor-container"}>
+    <div ref={containerRef} className={className + " relative lexical-editor-container"} data-fieldid={fieldId || undefined}>
       <LexicalComposer initialConfig={initialConfig}>
         {isMarkdown && <ToolbarPlugin />}
         
@@ -987,8 +989,8 @@ export function LexicalBadgeEditor({
         {/* Add markdown shortcuts when in markdown mode and not disabled */}
         {isMarkdown && !disableMarkdownShortcuts && <MarkdownShortcutPlugin transformers={customTransformers} />}
         
-        {/* Add auto-focus plugin */}
-        <AutoFocusPlugin />
+        {/* Add auto-focus plugin (optional) */}
+        {autoFocus && <AutoFocusPlugin />}
       </LexicalComposer>
     </div>
   );

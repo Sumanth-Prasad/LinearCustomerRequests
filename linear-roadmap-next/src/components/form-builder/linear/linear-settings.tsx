@@ -301,6 +301,19 @@ export function LinearSettings({
     }, 0);
   };
 
+  // Utility: blur response message editor to prevent scroll focus shifts
+  const blurResponseEditor = () => {
+    const el = document.querySelector('[data-fieldid="response_message"] [contenteditable="true"]') as HTMLElement | null;
+    if (el && document.activeElement === el) {
+      el.blur();
+    }
+  };
+
+  // Blur the response editor when other controls change to stop it from stealing focus
+  useEffect(() => {
+    blurResponseEditor();
+  }, [linearSettings.issueType, linearSettings.team, linearSettings.project, linearSettings.status, linearSettings.labels, linearSettings.assignee, linearSettings.priority]);
+
   return (
     <div className="border border-border p-4 rounded bg-background mt-6">
       <div className="flex justify-between items-center mb-4">
@@ -653,6 +666,7 @@ export function LinearSettings({
               fieldId="response_message"
               isMarkdown={true}
               disableMarkdownShortcuts={false}
+              autoFocus={false}
             />
             <p className="text-xs text-muted-foreground mt-1">
               Shown to users after form submission. Type @ to reference form fields. Supports markdown formatting.
