@@ -229,3 +229,745 @@ div[style*="pointer-events: none"] {
   z-index: 9999 !important;
 }
 
+/* Add styles for fixed Gantt sidebar */
+.fixed-sidebar {
+  position: sticky !important;
+  left: 0 !important;
+  z-index: 30 !important;
+  background-color: var(--background) !important;
+  box-shadow: 1px 0 3px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Make sure the timeline content is visible */
+[data-roadmap-ui="gantt-timeline"] {
+  overflow: visible !important;
+}
+
+/* Make sure rows are visible */
+.gantt {
+  display: grid !important;
+  grid-template-columns: var(--gantt-sidebar-width) 1fr !important;
+  overflow: auto !important;
+}
+
+/* Completely disable dragging for Gantt items */
+.gantt [role="button"],
+.gantt [data-dnd-draggable],
+.gantt [aria-pressed] {
+  cursor: default !important;
+  user-select: none !important;
+  /* Allow pointer events so elements are rendered properly */
+}
+
+/* Disable drag handles */
+.gantt [class*="drag-helper"] {
+  display: none !important;
+}
+
+/* Override drag handlers completely */
+.gantt *[data-draggable="true"],
+.gantt [aria-pressed="true"],
+.gantt [aria-pressed="false"] {
+  cursor: default !important;
+}
+
+/* Highlight Today marker line */
+.gantt .today-marker-line {
+  background-color: var(--color-blue-600) !important; /* blue not red */
+}
+
+/* Style Today marker label */
+.gantt .today-marker-label {
+  background-color: rgba(37, 99, 235, 0.2) !important;
+  color: var(--foreground) !important;
+  text-shadow: none !important;
+  font-weight: 600 !important;
+  position: relative !important;
+  z-index: 10 !important;
+  backdrop-filter: blur(2px) !important;
+}
+
+/* Dark mode specific styles */
+.dark .gantt .today-marker-label {
+  background-color: rgba(37, 99, 235, 0.25) !important;
+  color: var(--foreground) !important;
+}
+
+/* Style all Gantt marker lines */
+.gantt .h-full.w-px.bg-card {
+  background-color: rgba(71, 85, 105, 0.5); /* slate-600/50 for general markers */
+  width: 1px !important;
+}
+
+/* Specifically style Today marker line */
+.gantt div:has(> .today-marker-label) + .h-full.w-px.bg-card {
+  background-color: var(--color-blue-600) !important;
+  box-shadow: 0 0 8px rgba(37, 99, 235, 0.5) !important;
+  width: 4px !important;
+}
+
+/* Fix any hidden text behind markers */
+.gantt [class*="group-hover:max-h"] {
+  overflow: hidden !important;
+  background: transparent !important;
+  text-shadow: none !important;
+  z-index: 1 !important;
+}
+
+/* Ensure Gantt items are visible */
+.gantt [role="button"] {
+  visibility: visible !important;
+  opacity: 1 !important;
+  cursor: default !important;
+  display: flex !important;
+}
+
+/* Remove non-draggable feature wrapper pointer override */
+.non-draggable-feature {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.non-draggable-feature > * {
+  display: flex !important;
+}
+
+/* Hide date tooltip inside Today marker */
+.gantt .today-marker-label span {
+  display: none !important;
+}
+
+/* Ensure feature list grows vertically to fit all rows */
+.feature-list-auto-height {
+  height: auto !important;
+}
+
+/* Ensure timeline overflow is visible so rows aren\'t clipped */
+.overflow-visible-important {
+  overflow: visible !important;
+}
+
+/* Make timeline items explicitly non-draggable and fully opaque */
+.non-draggable-item {
+  pointer-events: none !important;
+  cursor: default !important;
+  user-select: none !important;
+  opacity: 1 !important;
+  background-color: var(--card) !important;
+}
+
+.non-draggable-item [aria-pressed],
+.non-draggable-item [data-draggable="true"],
+.non-draggable-item [role="button"] {
+  pointer-events: none !important;
+  cursor: default !important;
+  opacity: 1 !important;
+}
+
+/* Ensure Gantt feature items are completely immovable */
+.non-draggable-item > div {
+  pointer-events: none !important;
+  opacity: 1 !important;
+}
+
+.non-draggable-item .flex-1 {
+  pointer-events: none !important;
+  cursor: default !important;
+  opacity: 1 !important;
+}
+
+/* Disable DnD contexts completely */
+.gantt [data-dnd-context],
+.gantt [data-draggable="true"] {
+  pointer-events: none !important;
+}
+
+/* Specifically ensure gantt cards are visible and opaque */
+.gantt .h-full.w-full.rounded-md {
+  opacity: 1 !important;
+  background-color: var(--card) !important;
+  pointer-events: none !important;
+}
+
+/* Completely hide the Today marker hover tooltip */
+.gantt .today-marker-label span {
+  display: none !important;
+  max-height: 0 !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+}
+
+/* Make the Today marker label show only "Today" */
+.gantt .today-marker-label {
+  color: var(--foreground) !important;
+  font-weight: 600 !important;
+  padding-bottom: 0 !important;
+  background-color: var(--card) !important;
+}
+
+/* Add more rules to prevent dragging */
+.gantt [class*="drag-helper"],
+.gantt [data-draggable="true"],
+.gantt [aria-pressed] {
+  display: none !important;
+  pointer-events: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+}
+
+/* Force Today marker to hide unwanted text */
+.gantt .today-marker-label:after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
+}
+
+.gantt .today-marker-label .max-h-\[0\],
+.gantt .today-marker-label .transition-all,
+.gantt .today-marker-label span {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  height: 0 !important;
+  max-height: 0 !important;
+  overflow: hidden !important;
+}
+
+/* Fix background of today marker to match theme */
+.gantt .today-marker-label {
+  background-color: var(--card) !important;
+  border: 1px solid var(--border) !important;
+  padding: 2px 4px !important;
+  z-index: 50 !important;
+}
+
+/* Fix the today marker line */
+.gantt .today-marker-label + div.h-full.w-px.bg-card {
+  opacity: 1 !important;
+  z-index: 40 !important;
+}
+
+/* Completely disable all dragging in the gantt chart */
+.gantt *,
+.gantt *[data-dnd-draggable],
+.gantt *[role="button"] {
+  user-drag: none !important;
+  -webkit-user-drag: none !important;
+  user-select: none !important;
+  -moz-user-select: none !important;
+  -webkit-user-select: none !important;
+  -ms-user-select: none !important;
+}
+
+.gantt *[data-dnd-draggable="true"],
+.gantt *[aria-pressed="true"],
+.gantt *[aria-pressed="false"] {
+  cursor: default !important;
+  pointer-events: none !important;
+}
+
+/* Kill all DnD context sensitivity */
+.gantt [data-dnd-context] * {
+  pointer-events: none !important;
+  touch-action: none !important;
+}
+
+/* Remove any drag/drop handlers */
+.non-draggable-item *[data-draggable],
+.non-draggable-item div[role="button"] {
+  pointer-events: none !important;
+  touch-action: none !important;
+}
+
+/* More aggressive hiding of all today marker content except the "Today" label */
+.clean-today-marker {
+  position: relative !important;
+  overflow: visible !important;
+}
+
+.clean-today-marker::before {
+  content: "Today";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--card) !important;
+  color: var(--foreground) !important;
+  font-weight: 600 !important;
+  font-size: 0.75rem !important;
+  padding: 2px 8px !important;
+  border-radius: 0 0 4px 4px !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1) !important;
+  z-index: 100 !important;
+}
+
+/* Hide all other content in the today marker */
+.clean-today-marker > * {
+  opacity: 0 !important;
+  visibility: hidden !important;
+}
+
+/* Make sure only the marker line shows */
+.clean-today-marker + div.h-full.w-px {
+  background-color: var(--color-blue-600) !important;
+  z-index: 40 !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+/* Force color of the blue vertical line */
+.clean-today-marker ~ div.h-full.w-px.bg-card {
+  background-color: var(--color-blue-600) !important;
+  z-index: 40 !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  width: 4px !important;
+}
+
+/* Clear any date spans or unnecessary elements */
+.clean-today-marker span,
+.clean-today-marker div:not(.h-full):not(.w-px) {
+  display: none !important;
+}
+
+/* Direct override to replace the marker text with "Today" */
+.clean-today-marker div:first-child {
+  font-size: 0 !important;
+  letter-spacing: 0 !important;
+  line-height: 0 !important;
+  padding: 8px !important;
+  height: 30px !important;
+  overflow: hidden !important;
+  position: relative !important;
+}
+
+.clean-today-marker div:first-child::before {
+  content: "Today";
+  font-size: 0.75rem !important;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--foreground) !important;
+  background-color: var(--card) !important;
+  padding: 2px 8px !important;
+  letter-spacing: normal !important;
+  line-height: normal !important;
+}
+
+/* Only hide markers that aren't our today marker */
+.gantt div[style*="translateX"]:not(.clean-today-marker-parent) {
+  display: block !important;
+  visibility: visible !important;
+}
+
+/* Find and remove any possible rogue markers */
+.gantt div[style*="translateX"] div:not(.clean-today-marker-parent):not(.h-full):not(.w-px):not(.group) {
+  background-color: transparent !important;
+  color: transparent !important;
+  text-indent: -9999px !important;
+  font-size: 0 !important;
+  line-height: 0 !important;
+  overflow: hidden !important;
+  opacity: 0.5 !important;
+}
+
+/* Hide all markers except our specific today marker */
+.gantt div[style*="translateX"]:not(.clean-today-marker-parent) {
+  display: block !important;
+  visibility: visible !important;
+}
+
+/* Only show the clean-today-marker */
+.clean-today-marker, div.clean-today-marker {
+  display: block !important;
+  visibility: visible !important;
+  z-index: 50 !important;
+  opacity: 1 !important;
+}
+
+/* Make sure the today marker is always visible */
+.clean-today-marker {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  z-index: 100 !important;
+  pointer-events: auto !important;
+}
+
+/* Override to make sure the vertical line of today marker stays visible */
+.clean-today-marker + div.h-full.w-px.bg-card {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  z-index: 40 !important;
+}
+
+/* Force the parent of the today marker to be visible */
+.gantt div.clean-today-marker-parent {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  position: relative !important;
+  z-index: 100 !important;
+}
+
+/* Make sure the today marker and its line are clearly visible */
+.gantt .clean-today-marker div,
+.gantt .clean-today-marker + div.h-full.w-px {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  z-index: 100 !important;
+}
+
+/* Direct style for today's line */
+.gantt div.h-full.w-px.bg-card, 
+.clean-today-marker ~ div.h-full.w-px.bg-card {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  background-color: var(--color-blue-600) !important;
+  width: 4px !important;
+  z-index: 50 !important;
+}
+
+/* Make sure TODAY marker is always visible */
+.gantt-today-marker {
+  position: absolute !important;
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  z-index: 1999 !important;
+  background-color: blue !important; /* Use direct color for maximum compatibility */
+  width: 4px !important;
+  top: 0 !important;
+  bottom: 0 !important;
+  height: 100% !important;
+  pointer-events: none !important;
+  box-shadow: 0 0 8px rgba(0,0,255,0.5) !important;
+}
+
+/* Today marker text label */
+.gantt-today-label {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  z-index: 2000 !important;
+  position: sticky !important;
+  top: 0 !important;
+  padding: 4px 8px !important;
+  font-size: 0.75rem !important;
+  font-weight: 600 !important;
+  border-radius: 0 0 4px 4px !important;
+  background-color: white !important; /* Use direct color for maximum compatibility */
+  color: blue !important; /* Use direct color for maximum compatibility */
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+  border: 1px solid var(--border) !important;
+  pointer-events: none !important;
+  line-height: 1.2 !important;
+  text-align: center !important;
+}
+
+/* Style the Today marker badge used in the Gantt chart */
+.today-marker-badge {
+  background-color: var(--color-blue-600) !important;
+  color: var(--sidebar-foreground) !important;
+  font-weight: 600 !important;
+  padding: 4px 8px !important;
+  border-radius: 0 0 4px 4px !important;
+  box-shadow: 0 0 4px rgba(37, 99, 235, 0.4) !important;
+  z-index: 1000 !important;
+  position: relative !important;
+}
+
+/* Style the vertical line of the Today marker */
+.today-marker-badge ~ div.h-full.w-px.bg-card {
+  background-color: var(--color-blue-600) !important;
+  width: 4px !important;
+  opacity: 1 !important;
+  z-index: 999 !important;
+  box-shadow: 0 0 4px rgba(37, 99, 235, 0.4) !important;
+}
+
+/* HIGHLY VISIBLE TODAY MARKER */
+.fixed-today-marker {
+  position: absolute !important;
+  top: 0 !important;
+  left: 50% !important; /* Will be overridden by inline styles */
+  bottom: 0 !important;
+  width: 3px !important;
+  background-color: red !important;
+  z-index: 9999 !important;
+  pointer-events: none !important;
+}
+
+/* Today marker label */  
+.fixed-today-marker > div {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 10000 !important; 
+  background-color: red !important;
+  color: white !important;
+  font-weight: bold !important;
+  padding: 4px 8px !important;
+  border-radius: 0 0 4px 4px !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5) !important;
+  text-align: center !important;
+}
+
+/* --- Marker visibility overrides --- */
+.gantt div[style*="translateX"] {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+/* Update Today marker badge styling to use theme blue instead of red */
+.today-marker-badge {
+  background-color: var(--color-blue-600) !important;
+  color: var(--sidebar-foreground) !important;
+}
+
+.today-marker-badge ~ div.h-full.w-px.bg-card {
+  background-color: var(--color-blue-600) !important;
+}
+
+.gantt div[style*="translateX"] div {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+.gantt div[style*="translateX"] div:not(.clean-today-marker-parent):not(.h-full):not(.w-px):not(.group) {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+/* Style the Today marker tab */
+.today-marker-tab {
+  background-color: #3b82f6 !important; /* Light blue color */
+  color: white !important;
+  padding: 2px 8px !important;
+  font-weight: 500 !important;
+  border-radius: 0 0 4px 4px !important;
+  font-size: 0.75rem !important;
+  z-index: 50 !important;
+}
+
+.today-marker-tab span {
+  max-height: 0 !important;
+  overflow: hidden !important;
+  opacity: 0 !important;
+  transition: max-height 0.2s ease, opacity 0.1s ease !important;
+  color: white !important;
+}
+
+/* Show date on hover */
+.today-marker-tab:hover span {
+  max-height: 2rem !important;
+  opacity: 0.9 !important;
+  margin-top: 2px !important;
+}
+
+/* Thin vertical line */
+.today-marker-tab ~ div.h-full.w-px.bg-card {
+  background-color: #3b82f6 !important; /* Light blue to match the header */
+  width: 1px !important;
+  opacity: 1 !important;
+  z-index: 10 !important;
+  box-shadow: none !important;
+}
+
+/* Override all TODAY indicator lines to be thin */
+.gantt-today-marker,
+.today-marker-badge ~ div.h-full.w-px.bg-card,
+div.h-full.w-px.bg-card,
+.gantt .h-full.w-px.bg-card,
+[class*="today"] ~ div.h-full.w-px.bg-card {
+  width: 1px !important;
+  box-shadow: none !important;
+}
+
+/* Remove unused milestone-marker styles as we're using inline milestones now */
+.milestone-marker, 
+.milestone-marker::after,
+.milestone-marker ~ div.h-full.w-px.bg-card {
+  display: none !important;
+}
+
+/* Clear conflicting today marker rules */
+.gantt .today-marker-label,
+.gantt .today-marker-label span,
+.clean-today-marker,
+.fixed-today-marker,
+.gantt-today-marker,
+.gantt-today-label {
+  display: none !important;
+}
+
+/* Exact styling for GanttToday component to match shadcn's original */
+.today-marker-tab {
+  background-color: #3b82f6 !important; /* Light blue color */
+  color: white !important;
+  padding: 2px 8px !important;
+  font-weight: 500 !important;
+  border-radius: 0 0 4px 4px !important;
+  font-size: 0.75rem !important;
+  z-index: 50 !important;
+}
+
+.today-marker-tab span {
+  max-height: 0 !important;
+  overflow: hidden !important;
+  opacity: 0 !important;
+  transition: max-height 0.2s ease, opacity 0.1s ease !important;
+  color: white !important;
+}
+
+/* Show date on hover */
+.today-marker-tab:hover span {
+  max-height: 2rem !important;
+  opacity: 0.9 !important;
+  margin-top: 2px !important;
+}
+
+/* Thin vertical line */
+.today-marker-tab ~ div.h-full.w-px.bg-card {
+  background-color: #3b82f6 !important; /* Light blue to match the header */
+  width: 1px !important;
+  opacity: 1 !important;
+  z-index: 10 !important;
+  box-shadow: none !important;
+}
+
+/* Clear ALL previous today marker styling to start fresh */
+.today-marker-badge,
+.gantt-today-marker,
+.gantt-today-label,
+.fixed-today-marker,
+.clean-today-marker,
+.today-marker-label {
+  display: none !important;
+}
+
+/* Single definitive Today marker styling - exact shadcn style */
+.today-marker-tab {
+  background-color: rgb(59, 130, 246) !important; /* Light blue */
+  color: white !important;
+  padding: 2px 8px !important;
+  font-weight: 500 !important;
+  border-radius: 0 0 4px 4px !important;
+  font-size: 0.75rem !important;
+  z-index: 50 !important;
+}
+
+.today-marker-tab span {
+  max-height: 0 !important;
+  overflow: hidden !important;
+  opacity: 0 !important;
+  transition: max-height 0.2s ease, opacity 0.1s ease !important;
+  color: white !important;
+}
+
+/* Show date on hover */
+.today-marker-tab:hover span {
+  max-height: 2rem !important;
+  opacity: 0.9 !important;
+  margin-top: 2px !important;
+}
+
+/* Thin vertical line */
+.today-marker-tab ~ div.h-full.w-px.bg-card {
+  background-color: rgb(59, 130, 246) !important; /* Light blue to match the header */
+  width: 1px !important;
+  opacity: 1 !important;
+  z-index: 10 !important;
+  box-shadow: none !important;
+}
+
+/* Ensure the today line is EXACTLY 1px wide - override ANY other styling */
+.today-marker-tab ~ div.h-full.w-px.bg-card,
+div[class*="vertical-line"],
+div[class*="today-line"],
+div.h-full.w-px.bg-card,
+.gantt div.h-full.w-px.bg-card,
+*[class*="today"] ~ div.h-full.w-px {
+  width: 1px !important;
+  max-width: 1px !important;
+  min-width: 1px !important;
+  flex: 0 0 1px !important;
+  box-shadow: none !important;
+}
+
+/* Fine-tune the hover behavior for the date to ensure it appears below */
+.today-marker-tab {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+}
+
+.today-marker-tab span {
+  font-size: 0.7rem !important;
+  font-weight: normal !important;
+  display: block !important;
+  visibility: visible !important;
+  max-height: 0 !important;
+  overflow: hidden !important;
+  opacity: 0 !important;
+  transform: translateY(-5px) !important;
+  transition: all 0.2s ease !important;
+}
+
+.today-marker-tab:hover span {
+  max-height: 20px !important;
+  opacity: 0.9 !important;
+  transform: translateY(0) !important;
+  margin-top: 2px !important;
+}
+
+/* Adjust label to center perfectly and fit content */
+.today-marker-tab:not(.h-full) {
+  position: relative !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  padding: 2px 12px !important;
+  white-space: nowrap !important;
+  min-width: max-content !important; /* expand based on text */
+  text-align: center !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* Ensure span is also center-aligned */
+.today-marker-tab:not(.h-full) span {
+  text-align: center !important;
+  width: 100% !important;
+}
+
+/* Vertical line: exactly 1px */
+.today-marker-tab.h-full.w-px {
+  background-color: rgb(59, 130, 246) !important; /* same blue */
+  width: 1px !important;
+  min-width: 1px !important;
+  max-width: 1px !important;
+  padding: 0 !important;
+}
+

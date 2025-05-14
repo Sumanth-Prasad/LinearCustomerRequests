@@ -1,5 +1,6 @@
+// This is a Server Component that uses Client Components
 import React from "react";
-import { getLinearClient } from "@/lib/linear";
+import { getLinearClient, safeGraphQLQuery } from "@/lib/linear";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
@@ -28,6 +29,57 @@ async function fetchIssueDetails(issueId: string) {
     const stateObj = issue.state ? await issue.state : null;
     const assigneeObj = issue.assignee ? await issue.assignee : null;
     const teamObj = issue.team ? await issue.team : null;
+    
+    // Fetch customer requests associated with this issue
+    const customerNeedsQuery = `
+      query GetCustomerNeeds($issueId: ID!) {
+        customerNeeds(
+          filter: { issue: { id: { eq: $issueId } } }
+        ) {
+          nodes {
+            id
+            body
+            createdAt
+            customer {
+              id
+              name
+              domains
+            }
+            attachment {
+              url
+              title
+            }
+          }
+        }
+      }
+    `;
+
+    const customerNeedsData = await safeGraphQLQuery<{ 
+      customerNeeds?: {
+        nodes: Array<{
+          id: string;
+          body: string;
+          createdAt: string;
+          customer?: {
+            id: string;
+            name: string;
+            domains?: string[];
+          } | null;
+          attachment?: {
+            url: string;
+            title?: string;
+          } | null;
+        }>;
+      };
+    }>(
+      client,
+      customerNeedsQuery,
+      { issueId },
+      { customerNeeds: { nodes: [] } }
+    );
+    
+    // Processing customer needs data
+    const customerNeeds = customerNeedsData?.customerNeeds?.nodes || [];
     
     // Fetch all comment users in parallel
     const commentsWithUsers = await Promise.all(
@@ -74,6 +126,7 @@ async function fetchIssueDetails(issueId: string) {
       } : null,
       priority: issue.priority,
       comments: commentsWithUsers,
+      customerNeeds,
       updatedAt: issue.updatedAt,
       createdAt: issue.createdAt
     };
@@ -150,7 +203,7 @@ export default async function IssueDetailsPage({
                 id="description" 
                 name="description" 
                 defaultValue={issue.description || ""}
-                className="w-full min-h-[300px] p-4 resize-none bg-[#0c0c0c] border-0 text-base text-gray-200 placeholder:text-gray-500 focus-visible:outline-none focus-visible:ring-0 font-mono rounded-md border border-[#333]"
+                className="w-full min-h-[300px] p-4 resize-none bg-[#0c0c0c] text-base text-gray-200 placeholder:text-gray-500 focus-visible:outline-none focus-visible:ring-0 font-mono rounded-md border border-[#333]"
                 placeholder="Describe the issue in detail..."
               />
               <div className="flex items-center gap-2 text-sm text-gray-400 mt-1">
@@ -259,7 +312,66 @@ export default async function IssueDetailsPage({
             ) : (
               <div className="text-gray-400 italic mb-6 p-4 bg-[#222] rounded-md border border-dashed border-[#333] text-center">
                 No description provided
-          </div>
+              </div>
+            )}
+            
+            {/* Customer Requests Section */}
+            {issue.customerNeeds && issue.customerNeeds.length > 0 && (
+              <div className="mt-8 mb-6">
+                <h2 className="text-xl font-semibold mb-4 text-white flex items-center gap-2">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                    <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                    <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                  </svg>
+                  Customer Requests ({issue.customerNeeds.length})
+                </h2>
+                
+                <div className="space-y-4">
+                  {issue.customerNeeds.map(request => (
+                    <Card key={request.id} className="overflow-hidden bg-[#1a1a1a] border-[#333] shadow-md">
+                      <div className="flex justify-between items-center p-4 border-b border-[#333] bg-[#222]">
+                        <div className="flex items-center gap-2">
+                          <div className="bg-blue-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold">
+                            {request.customer?.name?.charAt(0) || 'C'}
+                          </div>
+                          <div>
+                            <div className="font-medium text-white">
+                              {request.customer?.name || 'Unknown Customer'}
+                              {request.customer?.domains && request.customer.domains.length > 0 && (
+                                <span className="ml-2 text-xs text-blue-400">
+                                  {request.customer.domains[0]}
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-xs text-gray-400">
+                              {new Date(request.createdAt).toLocaleString()}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="p-4 text-white">
+                        <MarkdownRenderer content={request.body} />
+                        
+                        {request.attachment && (
+                          <div className="mt-3 p-2 bg-[#333] rounded border border-[#444] text-sm">
+                            <a href={request.attachment.url} target="_blank" rel="noopener noreferrer" 
+                               className="text-blue-400 hover:text-blue-300 flex items-center gap-2">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="7 10 12 15 17 10"></polyline>
+                                <line x1="12" y1="15" x2="12" y2="3"></line>
+                              </svg>
+                              {request.attachment.title || "View original conversation"}
+                            </a>
+                          </div>
+                        )}
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              </div>
             )}
           </>
         )}

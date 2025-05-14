@@ -13,6 +13,19 @@ const nextConfig = {
   eslint: {
     // Run ESLint checking during build
     ignoreDuringBuilds: false
+  },
+  async rewrites() {
+    return [
+      // Make `/board` path render the existing roadmap page while keeping URL clean
+      {
+        source: "/board",
+        destination: "/roadmap",
+      },
+      {
+        source: "/board/:path*",
+        destination: "/roadmap/:path*",
+      },
+    ];
   }
 };
 
